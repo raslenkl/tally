@@ -1,0 +1,1347 @@
+<meta charset="utf-8">
+<title>Tally</title>
+<link rel="icon" href="icon.svg">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="theme-color" content="#000000">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Tally">
+<meta name="format-detection" content="telephone=no">
+<link rel="stylesheet" href="app.css?v=3">
+
+<div class="app" id="app"></div>
+<div id="timer"></div>
+<div class="tabs"><nav id="tabs"></nav></div>
+<div id="sheet"></div>
+<div id="over"></div>
+<div id="cam"></div>
+<div id="toast"></div>
+
+<script src="poses.js?v=9"></script>
+<script src="tips.js?v=2"></script>
+<script>
+/* ===================== Figures: two-pose animated stick athletes ===================== */
+const FLOOR='<line x1="8" y1="114" x2="152" y2="114" class="eq"/>';
+const FRONT='H:80,22 N:80,34 S1:68,36 S2:92,36 P:80,70 K:74,91 A:72,112 K2:86,91 A2:88,112 ';
+const STAND='H:80,22 N:80,33 P:80,68 K:80,90 A:80,112 ';
+const LIE='H:38,74 N:48,80 P:92,80 K:112,82 A:116,104 ';
+const BENCH='<line x1="8" y1="106" x2="152" y2="106" class="eq"/><rect x="40" y="84" width="72" height="5" rx="2" class="eqf"/>';
+const FIG={
+ curl:{eq:FLOOR,a:STAND+'E:80,52 W:82,72',b:'E:81,52 W:70,36',wt:['W']},
+ pushdown:{eq:FLOOR+'<line x1="114" y1="0" x2="114" y2="114" class="eq"/>',a:'H:76,22 N:78,33 P:80,68 K:80,90 A:80,112 E:84,52 W:100,40 C:114,4',b:'W:86,72'},
+ ohext:{eq:FLOOR+'<rect x="62" y="88" width="36" height="5" rx="2" class="eqf"/>',a:'H:80,42 N:80,53 P:80,86 K:102,88 A:104,112 E:74,34 W:62,46 C:20,108',b:'W:78,14'},
+ skull:{eq:BENCH,a:LIE+'E:48,58 W:38,72',b:'W:50,38',wt:['W']},
+ pressflat:{eq:BENCH,a:LIE+'E:64,88 W:62,66',b:'E:52,60 W:56,40',wt:['W']},
+ pressinc:{eq:'<line x1="8" y1="106" x2="152" y2="106" class="eq"/><line x1="42" y1="65" x2="96" y2="92" class="eq" style="stroke-width:6"/>',a:'H:44,52 N:52,60 P:88,84 K:106,86 A:112,106 E:66,70 W:62,50',b:'E:50,40 W:48,20',wt:['W']},
+ fly:{eq:FLOOR,a:FRONT+'E:52,40 W:36,46 E2:108,40 W2:124,46',b:'E:64,50 W:78,56 E2:96,50 W2:82,56',wt:['W','W2']},
+ raise:{eq:FLOOR,a:FRONT+'E:64,52 W:64,70 E2:96,52 W2:96,70',b:'E:50,34 W:34,36 E2:110,34 W2:126,36',wt:['W','W2']},
+ ohpress:{eq:FLOOR,a:FRONT+'E:54,38 W:54,20 E2:106,38 W2:106,20',b:'E:64,18 W:70,3 E2:96,18 W2:90,3',wt:['W','W2']},
+ row:{eq:FLOOR+'<rect x="54" y="84" width="28" height="5" rx="2" class="eqf"/><line x1="114" y1="82" x2="114" y2="102" class="eq"/><line x1="150" y1="40" x2="150" y2="114" class="eq"/>',a:'H:66,36 N:66,47 P:68,82 K:90,80 A:110,92 E:86,58 W:106,62 C:150,62',b:'E:48,58 W:66,64'},
+ pulldown:{eq:FLOOR+'<rect x="60" y="76" width="40" height="5" rx="2" class="eqf"/>',a:'H:80,22 N:80,34 S1:68,36 S2:92,36 P:80,74 K:72,92 A:72,112 K2:88,92 A2:88,112 E:58,22 W:54,4 E2:102,22 W2:106,4',b:'E:56,50 W:60,32 E2:104,50 W2:100,32',bar:1},
+ pullup:{eq:'<line x1="30" y1="16" x2="130" y2="16" class="eq" style="stroke-width:5"/>',a:'H:80,38 N:80,50 S1:68,52 S2:92,52 P:80,86 K:76,102 A:76,118 K2:84,102 A2:84,118 E:60,34 W:56,16 E2:100,34 W2:104,16',b:'H:80,12 N:80,26 S1:68,28 S2:92,28 P:80,62 K:76,80 A:76,98 K2:84,80 A2:84,98 E:50,28 E2:110,28'},
+ dip:{eq:FLOOR+'<line x1="62" y1="60" x2="102" y2="60" class="eq" style="stroke-width:5"/><line x1="98" y1="60" x2="98" y2="114" class="eq"/>',a:'H:80,22 N:80,34 P:80,70 K:76,88 A:88,100 E:81,47 W:82,60',b:'H:84,38 N:86,50 P:78,84 K:74,100 A:86,110 E:66,52'},
+ squat:{eq:FLOOR,a:STAND+'E:84,50 W:88,64',b:'H:90,49 N:86,60 P:72,92 K:94,94 E:100,66 W:92,56'},
+ lunge:{eq:FLOOR,a:STAND+'K2:80,90 A2:80,112 E:82,50 W:84,68',b:'H:80,36 N:80,47 P:80,82 K:100,90 A:100,112 K2:68,106 A2:48,110 E:82,64 W:84,82'},
+ hinge:{eq:FLOOR,a:'H:80,22 N:80,33 P:80,68 K:82,90 A:80,112 E:80,52 W:80,72',b:'H:48,48 N:58,52 P:90,66 K:84,90 E:58,72 W:58,92',wt:['W']},
+ legext:{eq:FLOOR+'<rect x="56" y="86" width="38" height="5" rx="2" class="eqf"/><line x1="56" y1="48" x2="56" y2="88" class="eq" style="stroke-width:5"/>',a:'H:64,40 N:64,51 P:68,84 K:90,84 A:92,106 E:70,68 W:80,82',b:'A:112,82',wt:['A']},
+ legcurl:{eq:FLOOR+'<rect x="28" y="76" width="92" height="5" rx="2" class="eqf"/>',a:'H:34,64 N:44,70 P:80,70 K:102,70 A:124,70 E:46,86 W:52,96',b:'A:106,48',wt:['A']},
+ calf:{eq:FLOOR,a:'H:80,22 N:80,33 P:80,68 K:80,90 A:78,112 T:92,112 E:81,52 W:82,72',b:'H:80,14 N:80,25 P:80,60 K:80,82 A:80,104 E:81,44 W:82,64'},
+ crunch:{eq:FLOOR,a:'H:84,42 N:84,53 P:84,88 K:84,110 A:106,112 E:74,46 W:78,36 C:70,0',b:'H:48,86 N:56,80 E:62,94 W:52,92'},
+ situp:{eq:'<line x1="8" y1="110" x2="152" y2="110" class="eq"/>',a:'H:30,100 N:40,104 P:80,106 K:100,86 A:118,108 E:34,92 W:40,84',b:'H:66,60 N:70,72 E:76,64 W:82,58'},
+ facepull:{eq:FLOOR+'<line x1="150" y1="0" x2="150" y2="114" class="eq"/>',a:STAND+'E:98,42 W:116,38 C:150,30',b:'E:64,34 W:80,24'},
+ pushup:{eq:'<line x1="8" y1="110" x2="152" y2="110" class="eq"/>',a:'H:28,74 N:38,78 P:90,92 K:110,99 A:132,106 E:40,92 W:42,108',b:'H:28,94 N:38,98 P:88,102 K:110,104 E:56,92'},
+ plank:{eq:'<line x1="8" y1="110" x2="152" y2="110" class="eq"/>',a:'H:28,84 N:38,90 P:90,94 K:110,99 A:132,106 E:38,106 W:56,106',b:'P:90,90'},
+ hangraise:{eq:'<line x1="40" y1="12" x2="120" y2="12" class="eq" style="stroke-width:5"/>',a:'H:74,40 N:80,46 P:80,82 K:80,100 A:80,118 E:80,28 W:80,12',b:'K:102,80 A:100,100'},
+ hollow:{eq:'<line x1="8" y1="108" x2="152" y2="108" class="eq"/>',a:'H:40,96 N:50,100 P:90,104 K:110,100 A:132,96 E:32,94 W:14,90',b:'H:42,88 N:52,94 K:112,94 A:134,86 E:34,86 W:16,78'}
+};
+const RM=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const pp=s=>{const o={};s.replace(/([A-Z]\d?):(-?\d+),(-?\d+)/g,(_,k,x,y)=>{o[k]=[+x,+y]});return o};
+function fig(id,dur=2.6){
+  const f=FIG[id]||FIG.curl,a=pp(f.a),b={...a,...pp(f.b||'')};
+  const an=(attr,va,vb)=>RM||va===vb?'':`<animate attributeName="${attr}" values="${va};${vb};${va}" dur="${dur}s" repeatCount="indefinite" calcMode="spline" keyTimes="0;.5;1" keySplines=".45 0 .55 1;.45 0 .55 1"/>`;
+  const seg=(p,q,w,cls='lim')=>a[p]&&a[q]?`<line class="${cls}" stroke-width="${w}" x1="${a[p][0]}" y1="${a[p][1]}" x2="${a[q][0]}" y2="${a[q][1]}">${an('x1',a[p][0],b[p][0])}${an('y1',a[p][1],b[p][1])}${an('x2',a[q][0],b[q][0])}${an('y2',a[q][1],b[q][1])}</line>`:'';
+  const dot=(k,r,cls)=>`<circle class="${cls}" r="${r}" cx="${a[k][0]}" cy="${a[k][1]}">${an('cx',a[k][0],b[k][0])}${an('cy',a[k][1],b[k][1])}</circle>`;
+  let s=f.eq||'';
+  if(a.C)s+=seg('C','W',1.2,'cab');
+  if(f.bar)s+=seg('W','W2',4,'eq');
+  s+=seg('P','K2',8)+seg('K2','A2',7)+seg('N','P',10)+seg('P','K',8)+seg('K','A',7)+seg('A','T',5);
+  if(a.S1)s+=seg('S1','S2',8)+seg('S1','E',7)+seg('E','W',6)+seg('S2','E2',7)+seg('E2','W2',6);
+  else s+=seg('N','E',7)+seg('E','W',6);
+  s+=dot('H',8,'hd');(f.wt||[]).forEach(k=>s+=dot(k,5.5,'wt'));
+  return `<svg class="fig" viewBox="0 0 160 120" aria-hidden="true">${s}</svg>`;
+}
+const CUES={
+ curl:['Elbows pinned to your sides','Squeeze at the top, 2–3 s on the way down','No swinging. If you swing, drop the load'],
+ pushdown:['Elbows locked at your ribs','Full lockout at the bottom'],
+ ohext:['Upper arms by your ears, elbows forward','Deep stretch behind your head','Only the forearms move'],
+ skull:['Lower behind your head, not to your nose','Upper arms tilted slightly back'],
+ pressflat:['Shoulder blades pinched and down','Lower with control','Press up and slightly back'],
+ pressinc:['Bench around 30°','Lower to the upper chest','Elbows about 45° from your body'],
+ fly:['Slight bend in the elbows, fixed','Big stretch, then hug a barrel'],
+ raise:['Lead with the elbows','Stop around shoulder height'],
+ ohpress:['Ribs down, glutes tight','Press to full lockout'],
+ row:['Chest up, pull with your elbows','Pause at the stomach','Let the shoulders stretch forward at the start'],
+ pulldown:['Drive the elbows to your ribs','Chest up, no swinging'],
+ pullup:['Start from a dead hang','Chin clears the bar','Lower in 2–3 s'],
+ dip:['Lean slightly forward','Shoulders just below the elbows at the bottom'],
+ squat:['Knees travel forward over the toes','As deep as you can control','Drive through the whole foot'],
+ lunge:['Long step','Back knee almost touches the floor'],
+ hinge:['Hips back, soft knees','Weight slides down the thighs','Stop at a full hamstring stretch'],
+ legext:['Pause 1 s at the top','Lower slowly'],
+ legcurl:['Hips pressed into the pad','Squeeze at the top, slow down'],
+ calf:['Full stretch at the bottom, 1 s pause','Up onto the big toe'],
+ crunch:['Curl the ribs toward the hips','Hips stay still'],
+ situp:['Feet anchored','Touch the floor behind you each rep'],
+ facepull:['Pull to your eyebrows','Hands finish beside the ears'],
+ pushup:['Body in one straight line','Chest touches the floor every rep','Elbows about 45°'],
+ plank:['Squeeze glutes, ribs down','Push the floor away'],
+ hangraise:['No swinging','Curl the pelvis up, not just the knees'],
+ hollow:['Lower back glued to the floor','Arms and legs only as low as you can hold']
+};
+
+/* ===================== Exercise library + default plan (all loads in kg) ===================== */
+const MUSC={chest:'Chest',back:'Back',fdelt:'Front delts',sdelt:'Side delts',rdelt:'Rear delts',bi:'Biceps',tri:'Triceps',fore:'Forearms',abs:'Abs',quad:'Quads',ham:'Hamstrings',glute:'Glutes',calf:'Calves'};
+const L=(n,g,m,r,rest=120,u='kg')=>({n,g,m,r,rest,u});
+const LIB={
+ incdb:L('Incline DB press','pressinc',{chest:1,fdelt:.5,tri:.5},[6,10],150), mpress:L('Machine chest press','pressflat',{chest:1,fdelt:.5,tri:.5},[8,12]),
+ dbpress:L('Flat DB press','pressflat',{chest:1,fdelt:.5,tri:.5},[6,10],150), bbbench:L('Barbell bench press','pressflat',{chest:1,fdelt:.5,tri:.5},[5,8],180),
+ incsm:L('Incline press, DB or Smith','pressinc',{chest:1,fdelt:.5,tri:.3},[6,10],150), incbb:L('Incline barbell press','pressinc',{chest:1,fdelt:.5,tri:.4},[5,8],180),
+ cfly:L('Cable fly','fly',{chest:1},[10,15],90), pecdeck:L('Pec deck','fly',{chest:1},[10,15],90),
+ dips:L('Dips','dip',{chest:.7,tri:.7},[5,12],120,'bw'),
+ pullup:L('Pull-ups','pullup',{back:1,bi:.5},[5,12],150,'bw'), chinup:L('Chin-ups','pullup',{back:1,bi:.8},[5,12],150,'bw'),
+ pdwide:L('Wide lat pulldown','pulldown',{back:1,bi:.3},[8,12]), pdclose:L('Close-grip pulldown','pulldown',{back:1,bi:.5},[8,12]),
+ csrow:L('Chest-supported row','row',{back:1,rdelt:.5,bi:.5},[8,12]), cswide:L('Chest-supported row, wide','row',{back:1,rdelt:.5},[8,12]),
+ crow:L('Seated cable row','row',{back:1,bi:.5},[8,12]), tbar:L('T-bar row','row',{back:1,rdelt:.4,bi:.5},[6,10],150),
+ dbrow:L('One-arm DB row','row',{back:1,bi:.5},[8,12]), mrow:L('Machine row','row',{back:1,rdelt:.4,bi:.4},[8,12]), pullover:L('Cable pullover','pulldown',{back:1},[10,15],90),
+ dbsp:L('Seated DB shoulder press','ohpress',{fdelt:1,sdelt:.3,tri:.5},[6,10],150), msp:L('Machine shoulder press','ohpress',{fdelt:1,sdelt:.3,tri:.5},[8,12]),
+ latr:L('DB lateral raise','raise',{sdelt:1},[10,20],75), clat:L('Cable lateral raise','raise',{sdelt:1},[12,20],60), mlat:L('Machine lateral raise','raise',{sdelt:1},[12,20],60),
+ face:L('Face pull','facepull',{rdelt:1,back:.3},[12,20],75), rdfly:L('Rear delt fly','raise',{rdelt:1},[12,20],60), revdeck:L('Reverse pec deck','fly',{rdelt:1},[12,20],60),
+ inccurl:L('Incline DB curl','curl',{bi:1},[8,12],90), hammer:L('Hammer curl','curl',{bi:.7,fore:.6},[8,12],75), dbcurl:L('DB curl','curl',{bi:1},[8,12],60),
+ bayes:L('Bayesian cable curl','curl',{bi:1},[10,15],60), preacher:L('Preacher curl','curl',{bi:1},[8,12],75), ezcurl:L('EZ-bar curl','curl',{bi:1},[6,10],90),
+ ccurl:L('Cable curl','curl',{bi:1},[10,15],60), spider:L('Spider curl','curl',{bi:1},[10,15],60),
+ ohtri:L('Overhead cable extension','ohext',{tri:1},[8,12],90), rope:L('Rope pushdown','pushdown',{tri:1},[10,15],75), pd1:L('One-arm cable pushdown','pushdown',{tri:1},[10,15],60),
+ skull:L('EZ-bar skullcrusher','skull',{tri:1},[8,12],60), jm:L('JM press','skull',{tri:1},[6,10],90), cgbench:L('Close-grip bench press','pressflat',{tri:1,chest:.5},[6,10],120), kick:L('Cable kickback','pushdown',{tri:1},[12,20],60),
+ hack:L('Hack squat','squat',{quad:1,glute:.5},[6,10],180), pend:L('Pendulum squat','squat',{quad:1,glute:.5},[6,10],180), bbsquat:L('Barbell squat','squat',{quad:1,glute:.6},[5,8],180),
+ lpress:L('Leg press','squat',{quad:1,glute:.5},[10,15],150), bss:L('Bulgarian split squat','lunge',{quad:1,glute:.7},[8,12],120),
+ rdl:L('Romanian deadlift','hinge',{ham:1,glute:1},[6,10],150), hipthrust:L('Hip thrust','hinge',{glute:1},[8,12],120),
+ slcurl:L('Seated leg curl','legcurl',{ham:1},[10,15],90), lcurl:L('Lying leg curl','legcurl',{ham:1},[10,15],90), legext:L('Leg extension','legext',{quad:1},[12,20],90),
+ calf:L('Standing calf raise','calf',{calf:1},[10,15],60), scalf:L('Seated calf raise','calf',{calf:1},[12,20],60),
+ crunch:L('Cable crunch','crunch',{abs:1},[10,15],60), hlr:L('Hanging leg raise','hangraise',{abs:1},[8,15],60,'bw'), abwheel:L('Ab wheel','plank',{abs:1},[6,12],60,'bw'),
+ // more choices for swaps and the exercise library
+ decbench:L('Decline bench press','pressflat',{chest:1,tri:.5},[6,10],150), smbench:L('Smith bench press','pressflat',{chest:1,fdelt:.5,tri:.5},[6,10],150),
+ incmach:L('Incline machine press','pressinc',{chest:1,fdelt:.5,tri:.4},[8,12]), dbfly:L('DB fly','fly',{chest:1},[10,15],90), lowfly:L('Low-to-high cable fly','fly',{chest:1,fdelt:.3},[12,15],75),
+ pushups:L('Push-ups','pushup',{chest:1,tri:.5,fdelt:.3},[10,25],75,'bw'), dipmach:L('Machine dip','dip',{tri:1,chest:.5},[8,12],90),
+ neutpd:L('Neutral-grip pulldown','pulldown',{back:1,bi:.5},[8,12]), sapd:L('One-arm cable pulldown','pulldown',{back:1,bi:.3},[10,15],75), mpd:L('Machine pulldown','pulldown',{back:1,bi:.4},[8,12]),
+ sapull:L('Straight-arm pulldown','pulldown',{back:1},[12,15],75), bbrow:L('Barbell row','row',{back:1,rdelt:.4,bi:.5},[6,10],150), sealrow:L('Seal row','row',{back:1,rdelt:.5,bi:.4},[8,12]),
+ meadows:L('Meadows row','row',{back:1,bi:.4},[8,12]), dl:L('Deadlift','hinge',{back:.7,glute:1,ham:.7},[3,6],180), hyper:L('Back extension','hinge',{glute:.8,ham:.8},[10,15],90),
+ shrug:L('DB shrug','row',{back:.5},[10,15],60), ohp:L('Standing overhead press','ohpress',{fdelt:1,sdelt:.3,tri:.5},[5,8],180), smsp:L('Smith shoulder press','ohpress',{fdelt:1,sdelt:.3,tri:.5},[6,10],150),
+ arnold:L('Arnold press','ohpress',{fdelt:1,sdelt:.4,tri:.4},[8,12]), frontr:L('Front raise','raise',{fdelt:1},[10,15],60), uprow:L('Cable upright row','raise',{sdelt:1,back:.3},[10,15],75),
+ crdfly:L('Cable rear delt fly','raise',{rdelt:1},[12,20],60),
+ bbcurl:L('Barbell curl','curl',{bi:1},[6,10],90), mcurl:L('Machine preacher curl','curl',{bi:1},[8,12],75), concurl:L('Concentration curl','curl',{bi:1},[10,15],60),
+ revcurl:L('Reverse-grip EZ curl','curl',{fore:1,bi:.5},[10,15],60), ropeham:L('Rope hammer curl','curl',{bi:.7,fore:.6},[10,15],60), wcurl:L('Wrist curl','curl',{fore:1},[12,20],45),
+ barpd:L('Straight-bar pushdown','pushdown',{tri:1},[8,12],75), vbarpd:L('V-bar pushdown','pushdown',{tri:1},[8,12],75), revpd:L('Reverse-grip pushdown','pushdown',{tri:1},[10,15],60),
+ dbohtri:L('DB overhead extension','ohext',{tri:1},[8,12],90), ezohtri:L('EZ-bar overhead extension','ohext',{tri:1},[8,12],90), ohtri1:L('One-arm cable overhead extension','ohext',{tri:1},[10,15],60),
+ dbskull:L('DB skullcrusher','skull',{tri:1},[8,12],75), benchdip:L('Bench dips','dip',{tri:1,chest:.3},[10,20],60,'bw'), diamond:L('Diamond push-ups','pushup',{tri:1,chest:.5},[8,20],60,'bw'),
+ smsq:L('Smith machine squat','squat',{quad:1,glute:.5},[6,10],150), frontsq:L('Front squat','squat',{quad:1,glute:.4},[5,8],180), goblet:L('Goblet squat','squat',{quad:1,glute:.5},[8,12],90),
+ beltsq:L('Belt squat','squat',{quad:1,glute:.6},[8,12],150), lunge:L('Walking lunge','lunge',{quad:1,glute:.7},[10,14],120), revlunge:L('Reverse lunge','lunge',{quad:.8,glute:.8},[8,12],90),
+ stepup:L('Step-up','lunge',{quad:1,glute:.7},[8,12],90), sissy:L('Sissy squat','legext',{quad:1},[8,15],75,'bw'),
+ dbrdl:L('DB Romanian deadlift','hinge',{ham:1,glute:1},[8,12],120), sldl:L('Stiff-leg deadlift','hinge',{ham:1,glute:.8},[6,10],150), gm:L('Good morning','hinge',{ham:1,glute:.7},[8,12],120),
+ nordic:L('Nordic curl','legcurl',{ham:1},[3,8],120,'bw'), stlcurl:L('Standing leg curl','legcurl',{ham:1},[10,15],75),
+ abduct:L('Hip abduction machine','hinge',{glute:1},[12,20],60), glutebr:L('Glute bridge','hinge',{glute:1,ham:.3},[10,15],90), cablekb:L('Cable glute kickback','hinge',{glute:1},[12,15],60),
+ lpcalf:L('Leg press calf raise','calf',{calf:1},[10,15],60), smcalf:L('Smith calf raise','calf',{calf:1},[10,15],60),
+ mcrunch:L('Machine crunch','crunch',{abs:1},[10,15],60), decsit:L('Decline sit-up','situp',{abs:1},[10,15],60,'bw'), hkr:L('Hanging knee raise','hangraise',{abs:1},[10,15],60,'bw'),
+ chop:L('Cable woodchop','crunch',{abs:1},[10,15],60)
+};
+const NOTES={ohtri:'Trains the long head of the triceps in a stretch, the biggest part of your arm.',inccurl:'Long-head biceps in a stretch. Go lighter than standing curls.',legext:'Last set: drop the weight 30% at failure and keep going.',dbcurl:'Superset A with skullcrushers, 60 s between.',skull:'Superset A.',bayes:'Superset B with one-arm pushdowns.',pd1:'Superset B.',hack:'Pendulum or barbell squat also fine. First big lift, freshest legs.'};
+const P=(id,name,dow,focus,ex)=>({id,name,dow,focus,ex:ex.map(([x,s])=>({x,s}))});
+const DEFAULT_PROGRAM=[
+ P('push','Push',1,'Chest, side delts, triceps',[['incdb',2],['mpress',2],['cfly',2],['latr',3],['ohtri',3],['rope',3]]),
+ P('pull','Pull',2,'Back, rear delts, biceps',[['pullup',2],['csrow',2],['pdclose',2],['face',2],['inccurl',3],['hammer',3]]),
+ P('legs','Leg demolition',3,'Once a week, all-out, then forget legs for 7 days.',[['hack',3],['rdl',3],['lpress',2],['slcurl',3],['legext',2],['calf',3],['hlr',2]]),
+ P('cb','Chest + Back',5,'Your Friday. Chest and back only.',[['dbpress',2],['pdwide',2],['incsm',2],['cswide',2],['dips',2],['crow',2]]),
+ P('sa','Shoulders + Arms',6,'Arm priority. Supersets keep it to an hour.',[['dbsp',2],['clat',3],['rdfly',2],['dbcurl',3],['skull',3],['bayes',3],['pd1',3]])
+];
+const DOW=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const FIG_FOR={chest:'pressflat',back:'row',fdelt:'ohpress',sdelt:'raise',rdelt:'raise',bi:'curl',tri:'pushdown',fore:'curl',abs:'crunch',quad:'squat',ham:'legcurl',glute:'hinge',calf:'calf'};
+
+/* ===================== Food ===================== */
+const FOODS=[
+ {n:'Couscous with lamb & veg',p:'1 plate, ~400 g',k:650,pr:30,c:85,f:20,fi:8,cat:'mom',al:'couscous kosksi lamb'},
+ {n:'Couscous with chicken',p:'1 plate, ~400 g',k:580,pr:35,c:80,f:14,fi:7,cat:'mom',al:'couscous kosksi chicken'},
+ {n:'Makrouna with meat',p:'1 plate, ~350 g',k:600,pr:25,c:80,f:20,fi:5,cat:'mom',al:'makrouna macarona pasta spaghetti'},
+ {n:'Mloukhia with beef',p:'1 bowl',k:500,pr:30,c:10,f:38,fi:4,cat:'mom',al:'mloukhia mloukhiya'},
+ {n:'Chorba frik',p:'1 bowl',k:250,pr:14,c:28,f:9,fi:4,cat:'mom',al:'chorba soup frik'},
+ {n:'Ojja, 2 eggs',p:'1 plate',k:300,pr:14,c:12,f:22,fi:3,cat:'mom',al:'ojja shakshuka'},
+ {n:'Tajine tunisien',p:'1 slice, ~150 g',k:330,pr:18,c:6,f:26,fi:1,cat:'mom',al:'tajine tagine'},
+ {n:'Brik à l\'œuf',p:'1 piece',k:300,pr:10,c:20,f:20,fi:1,cat:'mom',al:'brik'},
+ {n:'Lablabi with egg & bread',p:'1 bowl',k:550,pr:24,c:70,f:18,fi:12,cat:'out',al:'lablabi'},
+ {n:'Sandwich tunisien',p:'½ baguette, tuna & egg',k:650,pr:30,c:75,f:24,fi:4,cat:'out',al:'sandwich tuna thon'},
+ {n:'Chicken shawarma sandwich',p:'1 sandwich',k:600,pr:35,c:55,f:25,fi:3,cat:'out',al:'shawarma chawarma'},
+ {n:'Pizza',p:'2 slices, medium',k:560,pr:24,c:66,f:22,fi:4,cat:'out',al:'pizza'},
+ {n:'Burger with fries',p:'1 meal',k:1000,pr:35,c:95,f:52,fi:5,cat:'out',al:'burger fries'},
+ {n:'Grilled chicken breast',p:'200 g cooked',k:330,pr:62,c:0,f:8,fi:0,cat:'cook',al:'chicken breast grilled'},
+ {n:'Grilled fish',p:'1 whole, ~250 g',k:300,pr:45,c:0,f:12,fi:0,cat:'cook',al:'fish dorade loup'},
+ {n:'Minced beef, cooked',p:'150 g',k:375,pr:38,c:0,f:24,fi:0,cat:'cook',al:'mince beef viande hachee'},
+ {n:'Egg',p:'1 large',k:72,pr:6,c:0,f:5,fi:0,cat:'cook',al:'egg eggs omelette'},
+ {n:'Rice, cooked',p:'1 cup, ~180 g',k:235,pr:5,c:51,f:1,fi:1,cat:'cook',al:'rice'},
+ {n:'Pasta, cooked',p:'1 cup, ~150 g',k:220,pr:8,c:43,f:1,fi:3,cat:'cook',al:'pasta'},
+ {n:'Oats',p:'½ cup dry, 40 g',k:150,pr:5,c:27,f:3,fi:4,cat:'basic',al:'oats oatmeal'},
+ {n:'Bread / baguette',p:'¼ baguette, ~60 g',k:160,pr:5,c:32,f:1,fi:2,cat:'basic',al:'bread baguette tabouna khobz'},
+ {n:'Olive oil',p:'1 tbsp',k:120,pr:0,c:0,f:14,fi:0,cat:'basic',al:'oil olive'},
+ {n:'Whey protein',p:'1 scoop',k:120,pr:24,c:3,f:2,fi:0,cat:'basic',src:'label',al:'whey shake protein scoop'},
+ {n:'Milk, full fat',p:'250 ml',k:160,pr:8,c:12,f:9,fi:0,cat:'basic',src:'label',al:'milk'},
+ {n:'Plain yogurt',p:'1 pot, 125 g',k:75,pr:4,c:6,f:4,fi:0,cat:'basic',src:'label',al:'yogurt yaourt'},
+ {n:'Cheese',p:'1 slice / 30 g',k:110,pr:7,c:0,f:9,fi:0,cat:'basic',al:'cheese fromage'},
+ {n:'Dates',p:'3 dates',k:70,pr:1,c:19,f:0,fi:2,cat:'basic',al:'dates dattes deglet'},
+ {n:'Banana',p:'1 medium',k:105,pr:1,c:27,f:0,fi:3,cat:'basic',al:'banana'},
+ {n:'Apple / orange',p:'1 medium',k:80,pr:0,c:21,f:0,fi:4,cat:'basic',al:'apple orange fruit'},
+ {n:'Nuts',p:'handful, 30 g',k:180,pr:6,c:6,f:16,fi:3,cat:'basic',al:'nuts almonds peanuts'},
+ {n:'Soda',p:'1 can, 330 ml',k:140,pr:0,c:35,f:0,fi:0,cat:'basic',al:'soda coke cola'}
+];
+const CATS={mom:'Home dishes',cook:'Cooked basics',out:'Eating out',basic:'Staples',mine:'My items'};
+
+/* ===================== Warm-ups (per day, each step has swaps for whatever gear is free) ===================== */
+const HANG=['Dead hang 20 s, then scap pull-ups × 8','Light straight-arm cable pulldown × 12','Light lat pulldown × 15, slow'];
+const CUFF=['Side-lying DB rotation, 2–4 kg × 12 each','Light cable external rotation × 12 each','Light DB rear-delt fly × 15'];
+const WU={
+ push:[['Hang + shoulder blades',HANG],
+  ['Rotator cuff',CUFF],
+  ['Chest primer',['Light machine chest press × 15','Light DB bench press × 12','Push-ups × 10, slow']]],
+ pull:[['Hang + shoulder blades',HANG],
+  ['Rear delts',['Light face pull × 15','Light DB rear-delt fly × 15','Reverse pec-deck, light × 15']],
+  ['Lat primer',['Light lat pulldown × 15','Light machine row × 12','Pull-ups × 3, easy']]],
+ legs:[['Hips + knees',['Goblet squat, light DB × 10, pause 2 s at the bottom','Leg press, light × 15','Bodyweight squats × 15']],
+  ['Hamstrings',['Lying leg curl, light × 15','Light DB Romanian deadlift × 10','Back extension × 10']],
+  ['Quads',['Leg extension, light × 15','Hack squat, empty sled × 10','Goblet squat, light DB × 10']]],
+ cb:[['Hang + shoulder blades',HANG],
+  ['Rotator cuff',CUFF],
+  ['Push + pull primer',['Light machine chest press × 12 + light lat pulldown × 12','Push-ups × 10 + pull-ups × 3, easy','Light DB bench × 12 + light cable row × 12']]],
+ sa:[['Rotator cuff',CUFF],
+  ['Side delts',['Light DB lateral raise × 15','Light cable lateral raise × 12 each','Lateral raise machine, light × 15']],
+  ['Elbows',['Light DB curl × 15 + light rope pushdown × 15','Light cable curl × 15 + light pushdown × 15','Empty EZ-bar curl × 15 + light skullcrusher × 12']]]
+};
+const WU_GENERIC=[['Hang + shoulder blades',HANG],['Rotator cuff',CUFF],['Primer',['Light version of your first exercise × 15','Push-ups × 10 + pull-ups × 3, easy']]];
+const wuFor=day=>WU[day]||WU_GENERIC;
+const wuAlt=(day,i)=>((S.wuAlt[day]||{})[i])||0;
+// Ramp-up sets for the first loaded lift: 3 lighter sets that groove the movement without tiring you.
+function rampSets(id,kg){const d=def(id);if(d.u!=='kg'||!(+kg>0))return null;const st=stepFor(+kg),r=p=>Math.max(st,Math.round(+kg*p/st)*st);
+  return [[r(.5),8],[r(.7),4],[r(.85),2]].filter((x,i,a)=>x[0]<+kg&&(!i||x[0]>a[i-1][0]))}
+
+/* ===================== Per-set coaching ===================== */
+// What each set is for, shown behind the dot on the set number.
+function setTip(x,xi,i){const d=def(x.id),n=x.sets.length,last=i===n-1,heavy=d.r[0]<=6||d.rest>=150,sl=S.sleep[TODAY];
+  const rng=`${d.r[0]}–${d.r[1]} reps · rest ${Math.round(d.rest/60*2)/2} min after`;
+  const fragile=['hack','pend','bbsquat','rdl','bbbench','incbb','tbar','lpress','dbsp'].includes(x.id);
+  const h=lastFor(x.id);let t;
+  if(sl!=null&&sl<6.5&&last&&n>1)t=`<b>Optional today.</b> You slept ${sl} h. Skip this one, or stop 2 reps short.`;
+  else if(n===1)t=`<b>One all-out set.</b> Go to failure: stop when the next rep won't go up with clean form.`;
+  else if(!last&&i===0&&!h)t=`<b>Feeler set.</b> New exercise. Pick a load you think you'd fail at around ${d.r[1]+2}, then adjust the next set.`;
+  else if(!last)t=heavy?`<b>Working set, 1–2 in the tank.</b> Stop when you could do 1–2 more good reps. Save the grind for the last set.`:`<b>Working set, 1 in the tank.</b> Stop one rep short of failure.`;
+  else if(fragile)t=`<b>Last set: hard, not ugly.</b> Go until form starts to break, about 1 rep short of failure. No grinding on this lift.`;
+  else if(d.u==='bw')t=`<b>Last set: to failure.</b> Clean reps only. Past ${d.r[1]} reps? Add weight with a belt next session.`;
+  else t=`<b>Last set: to failure.</b> Keep going until a rep won't finish.${heavy?'':' Then 2–3 partial reps in the stretched half if you have them.'}`;
+  if(last&&x.id==='legext')t+=' Then drop the weight 30% and go again to failure.';
+  if(xi===0&&i===0&&d.u==='kg'&&rampSets(x.id,x.sets[0].kg))t=`<b>Ramp up first</b> (see Warm-up above). `+t;
+  return `${t}<br>${rng}`}
+
+/* ===================== Calisthenics ===================== */
+const MOVES=[{id:'push',n:'Push-ups',u:'reps',g:'pushup',m:'chest'},{id:'pull',n:'Pull-ups',u:'reps',g:'pullup',m:'back'},{id:'dip',n:'Dips',u:'reps',g:'dip',m:'chest'},{id:'hlr',n:'Hanging knee raises',u:'reps',g:'hangraise',m:'abs'},{id:'plank',n:'Plank',u:'s',g:'plank',m:'abs'}];
+const LADDERS=[
+ {id:'pull',n:'Pull-up → muscle-up',s:['8 strict pull-ups','10 strict','12 strict','5 chest-to-bar','Pull-up +10 kg × 5','3 explosive pull-ups to the waist','Band-assisted muscle-up','First strict muscle-up']},
+ {id:'push',n:'Push-up → one-arm',s:['20 push-ups','30 push-ups','15 diamond push-ups','10 decline push-ups','5 archer push-ups each side','10 archer each side','Assisted one-arm push-up','First one-arm push-up']},
+ {id:'core',n:'Core → L-sit',s:['60 s plank','10 hanging knee raises','10 hanging leg raises','5 toes-to-bar','Tuck L-sit 15 s','One-leg L-sit 10 s','Full L-sit 10 s']},
+ {id:'hs',n:'Handstand',s:['Pike hold on a box, 30 s','3 wall walks','Chest-to-wall hold 30 s','Chest-to-wall hold 60 s','Kick up, hold 5 s free','Freestanding 15 s']},
+ {id:'dip',n:'Dips → straight bar',s:['10 dips','15 dips','20 dips','Dip +10 kg × 6','5 straight-bar dips','10 straight-bar dips']}];
+const CIRCUITS=[
+ {id:'cindy',type:'amrap',n:'Cindy',tag:'Tom Holland',d:'20 min, as many rounds as possible. Holland\'s reported best: 27 rounds.',min:20,st:[['Pull-ups',5,'pullup'],['Push-ups',10,'pushup'],['Air squats',15,'squat']]},
+ {id:'monster',type:'ladder',n:'Monster pyramid',tag:'Tom Holland',d:'Climb 1→10 rounds and back down. Full version is 100 pull-ups and 500 squats. Start with the half.',st:[['Pull-ups',1,'pullup'],['Dips',2,'dip'],['Push-ups',3,'pushup'],['Sit-ups',4,'situp'],['Air squats',5,'squat']]},
+ {id:'room',type:'timed',n:'Room circuit',d:'No equipment, anywhere.',rounds:3,work:40,rest:20,rr:90,st:[['Push-ups',0,'pushup'],['Air squats',0,'squat'],['Pike push-ups',0,'pushup'],['Reverse lunges',0,'lunge'],['Plank',0,'plank'],['Burpees',0,'squat']]},
+ {id:'arms',type:'timed',n:'Arm pump, no gym',d:'Bodyweight arms for rest days.',rounds:3,work:40,rest:20,rr:60,st:[['Diamond push-ups',0,'pushup'],['Chin-ups, slow down',0,'pullup'],['Bench dips',0,'dip'],['Chin-up hold at the top',0,'pullup']]},
+ {id:'core',type:'timed',n:'Core finisher',d:'After a gym session.',rounds:2,work:40,rest:15,rr:30,st:[['Hollow hold',0,'hollow'],['Hanging knee raises',0,'hangraise'],['Plank',0,'plank'],['Crunches',0,'crunch']]}];
+
+/* ===================== Dates ===================== */
+const pad=n=>String(n).padStart(2,'0');
+const ymd=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+const parse=s=>{const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d)};
+const addDays=(s,n)=>{const d=parse(s);d.setDate(d.getDate()+n);return ymd(d)};
+const diffDays=(a,b)=>Math.round((parse(b)-parse(a))/864e5);
+let TODAY=ymd(new Date());
+const nowHM=()=>{const d=new Date();return pad(d.getHours())+':'+pad(d.getMinutes())};
+// Morning window for a fasted weigh-in: 04:00-11:00.
+const isMorning=hmS=>{const m=toMin(hmS);return m>=240&&m<660};
+const fmtDate=s=>{const d=parse(s);return DOW[d.getDay()]+' '+d.getDate()+' '+d.toLocaleString('en',{month:'short'})};
+const hm=m=>pad(Math.floor(m/60))+':'+pad(Math.round(m%60));
+const toMin=s=>{const [h,m]=s.split(':').map(Number);return h*60+m};
+const RAMADAN=['2027-02-08','2027-03-09'];
+
+/* ===================== State ===================== */
+const KEY='recomp.v3';
+function seed(){
+  return {
+    profile:{setup:false,name:'',sex:'m',dob:'2000-01-01',height:175,loc:'TN',goal:'recomp',stepsTN:5000,stepsMY:8000,lowEffort:false,since:TODAY,ceiling:80,kcalAdj:0,ramadan:'off',creatineStart:null,supps:[]},
+    program:JSON.parse(JSON.stringify(DEFAULT_PROGRAM)),customEx:{},
+    weights:[],waist:[],arm:[],food:{},myFoods:[],steps:{},sleep:{},supps:{},
+    log:[],
+    active:null,
+    gtg:{on:['pull','push','plank'],sets:6,max:{},days:{},remind:{start:'10:00',end:'22:00',every:90}},
+    ladders:{pull:0,push:0,core:0,hs:0,dip:0},
+    circLog:[]
+  };
+}
+let S;
+try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){S=null}
+if(!S||!S.profile)S=seed();
+function save(){skSync(true);try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}if(window.NX)NX.onSave()}
+// One-time upgrades for saved data.
+if(!S.v11){if(S.gtg&&!S.gtg.on.includes('plank'))S.gtg.on.push('plank');S.v11=1}
+// Most days are low-step days: don't assume 7,000.
+if(!S.v12){if(S.profile.stepsTN===7000)S.profile.stepsTN=4000;S.v12=1}
+S.meals=S.meals||[];S.wuAlt=S.wuAlt||{};
+let UI={tab:'today',foodCat:'mom',foodQ:'',foodMode:'snap',sheet:null,timerEnd:0,mapMode:'plan',caliTab:'reps',
+  desc:'',snap:null,db:null,tip:null,ph:{},phLook:{},phX:50,run:null};
+
+/* ===================== Logic ===================== */
+const ageOn=d=>{const b=parse(S.profile.dob),t=parse(d);let a=t.getFullYear()-b.getFullYear();if(t.getMonth()<b.getMonth()||(t.getMonth()==b.getMonth()&&t.getDate()<b.getDate()))a--;return a};
+// Only fasted morning weigh-ins count. Smoothing runs per calendar day: missed days are filled in
+// on a straight line between real entries, so a gap doesn't make one weigh-in swing the trend.
+const countedW=()=>S.weights.filter(w=>w.fasted!==false).sort((a,b)=>a.d<b.d?-1:1);
+function trendSeries(){const ws=countedW();let t=null,prev=null;const out=[];
+  ws.forEach(w=>{if(t==null)t=w.kg;else{const gap=diffDays(prev.d,w.d);for(let i=1;i<=gap;i++){const v=prev.kg+(w.kg-prev.kg)*i/gap;t+=0.15*(v-t)}}
+    prev=w;out.push({d:w.d,kg:w.kg,t:Math.round(t*100)/100,sample:w.sample})});return out}
+function trendNow(){const s=trendSeries();return s.length?s[s.length-1].t:null}
+const W=()=>trendNow()||S.profile.startKg||74;
+// Supplements shown and reminded. Old data has no list: it keeps all four.
+const hasSupp=k=>!Array.isArray(S.profile.supps)||S.profile.supps.includes(k);
+function weeklyRate(){const s=trendSeries();if(s.length<2)return null;const last=s[s.length-1];const ref=s.filter(x=>diffDays(x.d,last.d)>=6).pop()||s[0];const days=diffDays(ref.d,last.d);if(days<3)return null;return (last.t-ref.t)/days*7}
+const dayFood=d=>(S.food[d]||[]);
+const sumFood=d=>dayFood(d).reduce((a,e)=>({k:a.k+e.k*e.x,pr:a.pr+e.pr*e.x,c:a.c+e.c*e.x,f:a.f+e.f*e.x,fi:a.fi+(e.fi||0)*e.x}),{k:0,pr:0,c:0,f:0,fi:0});
+function measuredTDEE(){
+  const s=trendSeries();if(s.length<10)return null;
+  const days=[];for(let i=1;i<=21;i++){const d=addDays(TODAY,-i);if(dayFood(d).length)days.push(sumFood(d).k)}
+  if(days.length<14)return null;
+  const first=s.find(x=>diffDays(x.d,TODAY)<=21)||s[0],last=s[s.length-1];const span=diffDays(first.d,last.d);if(span<10)return null;
+  return Math.round((days.reduce((a,b)=>a+b,0)/days.length-(last.t-first.t)/span*7700)/10)*10;
+}
+function targets(){
+  const p=S.profile,w=W(),set=p.loc==='MY'?p.stepsMY:p.stepsTN;
+  // Real step counts beat the setting once there are enough of them (last 14 days, 5+ days logged).
+  const lg=[];for(let i=1;i<=14;i++){const v=S.steps[addDays(TODAY,-i)];if(v>0)lg.push(v)}
+  const steps=lg.length>=5?Math.round(lg.reduce((a,b)=>a+b,0)/lg.length/100)*100:set;
+  const est=p.sex&&p.setup!=null?Math.round((1.2*(10*w+6.25*p.height-5*ageOn(TODAY)+(p.sex==='f'?-161:5))+steps*0.0005*w+100)/10)*10
+    :Math.round((2580+(w-75)*24+(steps-11000)*0.0005*w)/10)*10;
+  const meas=measuredTDEE(),maint=meas||est;
+  // Check-in tweaks belong to the maintenance they corrected. Once measured maintenance takes over, old tweaks drop.
+  const adj=(p.adjOn||'est')===(meas?'meas':'est')?(p.kcalAdj||0):0;
+  const auto=Math.round((maint+{recomp:0,gain:250,cut:-450}[p.goal]+adj)/50)*50;
+  const k=p.kcalOver>0?p.kcalOver:auto,ppk=p.protPerKg>0?p.protPerKg:2.2,fpk=p.fatPerKg>0?p.fatPerKg:0.9;
+  const pr=Math.round(w*ppk/5)*5,f=Math.round(w*fpk/5)*5,c=Math.max(0,Math.round((k-pr*4-f*9)/4));
+  return {k,pr,f,c,maint,est,meas,steps,adj,auto,ppk,fpk,manual:p.kcalOver>0};
+}
+const def=id=>{const d=LIB[id]||S.customEx[id];return d?{id,...d}:{id,n:id,g:'curl',m:{},r:[8,12],rest:90,u:'kg'}};
+const primary=d=>Object.entries(d.m).sort((a,b)=>b[1]-a[1])[0]?.[0];
+function lastFor(id){for(let i=S.log.length-1;i>=0;i--){const s=S.log[i].ex[id];if(s&&s.length)return {d:S.log[i].d,sets:s}}return null}
+const unitLabel=u=>u==='bw'?'+kg':'kg';
+const stepFor=kg=>kg>=60?5:2.5;
+function suggest(d){
+  const h=lastFor(d.id);
+  if(!h)return {kg:'',txt:`New. Pick a load you can lift for ${d.r[1]} reps with 1–2 left in the tank.`};
+  const top=Math.max(...h.sets.map(s=>s[0]));const work=h.sets.filter(s=>s[0]===top);const reps=work.map(s=>s[1]);
+  const hit=work.length>=2&&reps.every(r=>r>=d.r[1]);
+  const shown=h.sets.map(s=>(d.u==='bw'&&!s[0]?'BW':s[0])+'×'+s[1]).join(', ');
+  if(hit){const n=top+stepFor(top);return {kg:n,txt:`Last ${fmtDate(h.d)}: ${shown}. Both sets hit ${d.r[1]}. Go up to <b>${n} kg</b>, aim for ${d.r[0]}+.`}}
+  return {kg:top,txt:`Last ${fmtDate(h.d)}: ${shown}. Same load, beat <b>${reps.join(' / ')}</b>. Move up when two sets reach ${d.r[1]}.`};
+}
+const e1=(kg,r)=>kg*(1+r/30);
+// One point per session for an exercise: estimated 1RM, or best reps for bodyweight-only sets
+function exHistory(id){const out=[];S.log.forEach(l=>{const s=l.ex[id];if(!s||!s.length)return;const kgd=s.some(z=>z[0]>0);
+  const v=kgd?Math.max(...s.map(([kg,r])=>kg?e1(kg,r):0)):Math.max(...s.map(z=>z[1]));out.push({d:l.d,sets:s,v,kgd})});return out.sort((a,b)=>a.d<b.d?-1:1)}
+function miniChart(pts,unit){if(pts.length<2)return '<p class="small muted">The chart shows up after 2 sessions.</p>';
+  const Wd=320,H=120,P=8,vs=pts.map(p=>p.v),lo=Math.min(...vs),hi=Math.max(...vs),sp=hi-lo||1;
+  const xy=pts.map((p,i)=>[P+i*(Wd-2*P)/(pts.length-1),H-P-((p.v-lo)/sp)*(H-2*P-14)]);
+  const best=vs.indexOf(hi);
+  return `<svg viewBox="0 0 ${Wd} ${H}" width="100%" role="img" aria-label="Progress over ${pts.length} sessions"><path d="M${xy.map(q=>q.map(n=>n.toFixed(1)).join(' ')).join(' L')}" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round"/>
+   ${xy.map((q,i)=>`<circle cx="${q[0].toFixed(1)}" cy="${q[1].toFixed(1)}" r="${i===best?4.5:2.5}" fill="${i===best?'var(--accent)':'var(--muted)'}"/>`).join('')}
+   <text x="${P}" y="12" font-size="11" fill="var(--muted)">${Math.round(hi)} ${unit} best</text><text x="${Wd-P}" y="${H-1}" font-size="10" fill="var(--muted)" text-anchor="end">${fmtDate(pts[pts.length-1].d)}</text><text x="${P}" y="${H-1}" font-size="10" fill="var(--muted)">${fmtDate(pts[0].d)}</text></svg>`}
+const sortLog=()=>S.log.sort((a,b)=>a.d<b.d?-1:a.d>b.d?1:0);
+// After editing an old session: drop sets with no reps, empty exercises, and sessions left with nothing
+function cleanLog(){const e=UI.sheet&&UI.sheet.e;if(!e)return;Object.keys(e.ex).forEach(id=>{e.ex[id]=e.ex[id].filter(z=>z[1]>0);if(!e.ex[id].length)delete e.ex[id]});
+  if(!Object.keys(e.ex).length){const i=S.log.indexOf(e);if(i>=0)S.log.splice(i,1)}save()}
+function records(){const best={};S.log.forEach(l=>Object.entries(l.ex).forEach(([id,sets])=>sets.forEach(([kg,r])=>{if(!kg)return;const v=e1(kg,r);if(!best[id]||v>best[id].v)best[id]={v,kg,r,d:l.d}})));return best}
+const dayForDate=d=>{const r=S.resched;if(r&&d in r)return r[d]?S.program.find(x=>x.id===r[d]):undefined;return S.program.find(x=>x.dow===parse(d).getDay())};
+function nextTraining(){for(let i=0;i<7;i++){const d=addDays(TODAY,i),p=dayForDate(d);if(p)return {d,p}}return {d:TODAY,p:S.program[0]}}
+const gtgDay=d=>(S.gtg.days[d]||(S.gtg.days[d]={}));
+const maxOf=id=>{const m=S.gtg.max[id];return m&&m.length?m[m.length-1].v:null};
+const setSize=id=>{const m=maxOf(id);return m?Math.max(1,Math.round(m*0.5)):5};
+function trainedToday(){const p=dayForDate(TODAY);if(!p)return new Set();const s=new Set();p.ex.forEach(e=>{const pm=primary(def(e.x));if(pm)s.add(pm)});return s}
+function slots(){const r=S.gtg.remind,a=toMin(r.start),b=toMin(r.end),o=[];for(let t=a;t<=b;t+=r.every)o.push(t);return o}
+// Rep reminders: the next one comes `every` minutes after your LAST logged set, inside your window.
+// Skip a whole morning and you still get one reminder, not four.
+function gtgMark(){S.gtg.last={d:TODAY,m:nowMin()}}
+function gtgNext(){const r=S.gtg.remind,a=toMin(r.start),b=toMin(r.end),l=S.gtg.last;const m=l&&l.d===TODAY?Math.max(a,l.m+r.every):a;return m<=b?m:null}
+const everyTxt=v=>v<120?v+' min':(v/60)+' h';
+function ramadanOn(d=TODAY){const r=S.profile.ramadan;return r==='on'||(r==='auto'&&d>=RAMADAN[0]&&d<=RAMADAN[1])}
+function ramadanTimes(d=TODAY){const t=Math.min(1,Math.max(0,diffDays(RAMADAN[0],d)/29));return {iftar:hm(18*60+5+t*23),suhoor:hm(5*60+38-t*32)}}
+function muscleSets(mode){
+  const o={};Object.keys(MUSC).forEach(k=>o[k]=0);
+  if(mode==='plan')S.program.forEach(d=>d.ex.forEach(e=>Object.entries(def(e.x).m).forEach(([k,v])=>o[k]+=e.s*v)));
+  else{const dow=(parse(TODAY).getDay()+6)%7,mon=addDays(TODAY,-dow);S.log.filter(l=>l.d>=mon).forEach(l=>Object.entries(l.ex).forEach(([id,sets])=>Object.entries(def(id).m).forEach(([k,v])=>o[k]+=sets.length*v)))}
+  return o;
+}
+function suppStreak(k){let n=0;for(let i=0;i<400;i++){const d=addDays(TODAY,-i),s=S.supps[d];if(s&&s[k])n++;else if(i>0)break}return n}
+function pullPlan(max){
+  if(max==null)return 'Test your max first. One all-out set, full range, after a warm-up.';
+  if(max<3)return '<b>Negatives.</b> On rest days: 4 × 3 slow negatives (jump up, lower in 5 s) and 3 × 8 scap pulls. Daily: one negative every couple of hours.';
+  if(max<8)return '<b>Ladders.</b> On rest days: climb 1, 2, 3 reps with short rests, repeat 3–4 times. Daily: sets of '+Math.max(1,Math.round(max/2))+'.';
+  if(max<=12)return '<b>Volume.</b> Daily sets of '+Math.round(max/2)+'. Thursday: 5 sets of '+(max-3)+' with 90 s rest. Retest every 2 weeks. Expect about +1 rep per fortnight.';
+  return '<b>Weighted.</b> Thursday: 4 × 5 with +5–10 kg. Daily unweighted sets of '+Math.round(max/2)+'. Start the muscle-up ladder.';
+}
+const BIG3=[['push','Push-ups','reps',2],['pull','Pull-ups','reps',1],['plank','Plank','s',10]];
+const bestOf=id=>{const h=S.gtg.max[id];return h&&h.length?Math.max(...h.map(x=>x.v)):null};
+const fmtV=(id,v)=>id==='plank'?(v>=60?Math.floor(v/60)+':'+pad(v%60):v+'<small>s</small>'):v;
+// A daily set or gym set that beats your best counts as a new record.
+function maybePR(id,v,src){const mx=bestOf(id);if(!(v>(mx||0)))return false;(S.gtg.max[id]=S.gtg.max[id]||[]).push({d:TODAY,v,src});return true}
+function prTiles(){return `<div class="prs">${BIG3.map(([id,n,u,step])=>{const h=S.gtg.max[id]||[],mx=bestOf(id),first=h[0]&&h[0].v,dl=mx!=null&&first!=null?mx-first:0;
+  return `<button class="pr" data-a="maxtest" data-m="${id}"><span class="label">${n}</span><span class="v">${mx!=null?fmtV(id,mx):'–'}</span>
+   <span class="d">${dl>0?'+'+(id==='plank'?dl+' s':dl)+' since start':'&nbsp;'}</span>${spark(h)}
+   <span class="small muted">${mx!=null?'Next: '+fmtV(id,mx+step).toString().replace(/<\/?small>/g,''):'Tap to test'}</span></button>`}).join('')}</div>`}
+function plankPlan(max){
+  if(max==null)return 'Test your best hold first: ribs down, glutes tight, stop when your hips sag.';
+  if(max<60)return '<b>Build the base.</b> Daily holds of '+Math.round(max/2)+' s. Three times a week: 3 holds at 80% of your best. Retest every 2 weeks.';
+  if(max<120)return '<b>Longer holds.</b> Daily holds of '+Math.round(max/2)+' s. Twice a week: 3 × '+Math.round(max*0.8)+' s, plus 3 × 20 s hollow holds.';
+  return '<b>Make it harder, not longer.</b> Past 2 minutes, add a plate on your back or do RKC planks (squeeze everything) for 3 × 20 s, and train the L-sit.';
+}
+function pushPlan(max){
+  if(max==null)return 'Test your max first. Chest touches the floor each rep, body straight.';
+  if(max<10)return '<b>Incline first.</b> Hands on a bench: 3 × 10–15 every other day. Daily: sets of '+Math.max(1,Math.round(max/2))+' on the floor.';
+  if(max<25)return '<b>Grease the groove.</b> Daily sets of '+Math.round(max/2)+'. Three times a week finish with one max set. Retest every 2 weeks.';
+  if(max<40)return '<b>Harder angles.</b> Daily sets of '+Math.round(max/2)+'. Add diamond and decline push-ups 3 × 10 twice a week.';
+  return '<b>Unilateral.</b> Push-ups are now conditioning. Train archer push-ups 4 × 5 each side and climb the one-arm ladder.';
+}
+
+/* ===================== Helpers ===================== */
+const $=s=>document.querySelector(s);
+const hook=(n,...a)=>window.NX&&NX[n]?NX[n](...a):'';
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmt=n=>Math.round(n).toLocaleString('en');
+function toast(t,undo){const el=$('#toast');toast.undo=undo||null;el.innerHTML=`<div class="toast"${undo?' style="display:flex;gap:14px;align-items:center"':''}>${esc(t)}${undo?'<button data-a="undo" style="background:none;border:0;color:var(--accent);font:inherit;font-weight:800;padding:0">Undo</button>':''}</div>`;clearTimeout(toast.h);toast.h=setTimeout(()=>{el.innerHTML='';toast.undo=null},undo?5000:2200)}
+function ring(v,max,big,small,color){const r=42,C=2*Math.PI*r,p=Math.min(1,max?v/max:0);
+  return `<div class="ring"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="${r}" fill="none" stroke="var(--raise)" stroke-width="10"/><circle cx="50" cy="50" r="${r}" fill="none" stroke="${color}" stroke-width="10" stroke-linecap="round" stroke-dasharray="${C*p} ${C}"/></svg><div class="c"><div><b>${big}</b><br><span>${small}</span></div></div></div>`}
+let actx;function beep(f=880,ms=140){try{actx=actx||new (window.AudioContext||window.webkitAudioContext)();const o=actx.createOscillator(),g=actx.createGain();o.frequency.value=f;o.connect(g);g.connect(actx.destination);g.gain.setValueAtTime(.18,actx.currentTime);g.gain.exponentialRampToValueAtTime(.001,actx.currentTime+ms/1000);o.start();o.stop(actx.currentTime+ms/1000)}catch(_){}}
+const buzz=ms=>{try{navigator.vibrate&&navigator.vibrate(ms)}catch(_){}};
+let wake;async function keepAwake(on){try{if(on&&navigator.wakeLock)wake=await navigator.wakeLock.request('screen');else if(wake){wake.release();wake=null}}catch(_){}}
+const nowMin=()=>{const d=new Date();return d.getHours()*60+d.getMinutes()};
+const I={
+ gear:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="20" height="20"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>',
+ today:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><path d="M12 7v5l3 2"/></svg>',
+ train:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12h2M20 12h2M6 7v10M18 7v10M4 9v6M20 9v6M6 12h12"/></svg>',
+ eat:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="13" r="8"/><circle cx="12" cy="13" r="4"/></svg>',
+ body:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l5-5 4 3 8-8M15 7h5v5"/></svg>',
+ cali:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 4h18"/><circle cx="12" cy="11" r="2"/><path d="M7 4l3 5M17 4l-3 5M12 13v4l-3 4M12 17l3 4"/></svg>',
+ check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" width="20" height="20"><path d="M5 12l5 5L20 7"/></svg>',
+ x:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="16" height="16"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+ dots:'<svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>'
+};
+
+
+/* ===================== Train ===================== */
+function musclemap(o){
+  const op=k=>(0.12+0.88*Math.min(1,(o[k]||0)/16)).toFixed(2);
+  const M=(k,shape)=>shape.replace('/>',` class="m" fill="var(--accent)" fill-opacity="${op(k)}"><title>${MUSC[k]}: ${(+o[k]).toFixed(1)} sets</title></`+shape.match(/^<(\w+)/)[1]+'>');
+  const base='<ellipse class="base" cx="60" cy="18" rx="11" ry="13"/><rect class="base" x="54" y="30" width="12" height="9"/><rect class="base" x="44" y="104" width="32" height="16" rx="6"/><ellipse class="base" cx="49" cy="226" rx="8" ry="5"/><ellipse class="base" cx="71" cy="226" rx="8" ry="5"/>';
+  const arms=k=>M(k,'<ellipse cx="29" cy="73" rx="6.5" ry="14"/>')+M(k,'<ellipse cx="91" cy="73" rx="6.5" ry="14"/>')+M('fore','<ellipse cx="25" cy="104" rx="5.5" ry="15"/>')+M('fore','<ellipse cx="95" cy="104" rx="5.5" ry="15"/>');
+  const calves=M('calf','<ellipse cx="50" cy="198" rx="7" ry="19"/>')+M('calf','<ellipse cx="70" cy="198" rx="7" ry="19"/>');
+  const front=base+M('sdelt','<ellipse cx="37" cy="48" rx="10" ry="9"/>')+M('sdelt','<ellipse cx="83" cy="48" rx="10" ry="9"/>')
+   +M('chest','<rect x="40" y="42" width="19" height="22" rx="6"/>')+M('chest','<rect x="61" y="42" width="19" height="22" rx="6"/>')
+   +M('abs','<rect x="46" y="66" width="28" height="38" rx="6"/>')+arms('bi')
+   +M('quad','<rect x="42" y="121" width="17" height="52" rx="8"/>')+M('quad','<rect x="61" y="121" width="17" height="52" rx="8"/>')+calves;
+  const back=base+M('rdelt','<ellipse cx="37" cy="48" rx="10" ry="9"/>')+M('rdelt','<ellipse cx="83" cy="48" rx="10" ry="9"/>')
+   +M('back','<polygon points="48,36 72,36 80,48 60,58 40,48"/>')+M('back','<polygon points="40,52 58,60 58,102 46,96"/>')+M('back','<polygon points="80,52 62,60 62,102 74,96"/>')
+   +arms('tri')+M('glute','<rect x="44" y="104" width="15" height="22" rx="8"/>')+M('glute','<rect x="61" y="104" width="15" height="22" rx="8"/>')
+   +M('ham','<rect x="43" y="128" width="16" height="44" rx="8"/>')+M('ham','<rect x="61" y="128" width="16" height="44" rx="8"/>')+calves;
+  return `<div class="musclemap"><div><svg viewBox="0 0 120 236" role="img" aria-label="Front muscles">${front}</svg><p class="label" style="text-align:center">Front</p></div><div><svg viewBox="0 0 120 236" role="img" aria-label="Back muscles">${back}</svg><p class="label" style="text-align:center">Back</p></div></div>`;
+}
+function warmupCard(a){
+  const steps=wuFor(a.day),done=a.wu||[],n=steps.filter((_,i)=>done[i]).length,all=n===steps.length;
+  const first=a.list.find(x=>def(x.id).u==='kg'),ramp=first&&rampSets(first.id,first.sets[0]&&first.sets[0].kg);
+  return `<details class="card stack" ${all?'':'open'}><summary class="row between"><span><h3>Warm-up</h3><span class="small muted">${all?'Done':'~5 min · '+n+'/'+steps.length}</span></span><span class="chip">${all?'Show':'Hide'}</span></summary>
+   <div class="list" style="margin-top:8px">${steps.map(([what,opts],i)=>{const k=wuAlt(a.day,i)%opts.length;return `<div class="wu${done[i]?' on':''}"><button class="bx${done[i]?' on':''}" data-a="wutick" data-i="${i}" aria-label="Done: ${esc(what)}">${done[i]?I.check:''}</button>
+    <div class="grow"><p class="label" style="margin-bottom:1px">${what}</p><p class="wn small">${opts[k]}</p>${opts.length>1?`<button class="alt" data-a="wualt" data-i="${i}">Taken? Other option ↻</button>`:''}</div></div>`}).join('')}
+    ${ramp&&ramp.length?`<div class="wu"><span class="bx" aria-hidden="true"></span><div class="grow"><p class="label" style="margin-bottom:1px">Ramp up · ${def(first.id).n}</p><p class="small">${ramp.map(([kg,r])=>`${kg} kg × ${r}`).join(' → ')}, then your working sets. Easy reps, rest 60 s.</p></div></div>`:''}
+   </div><p class="small muted" style="margin-top:6px">Your swaps are remembered for this day. Tap any set number below to see what that set is for.</p></details>`}
+
+/* ===================== Food ===================== */
+// Meals you eat again and again: built from the last 45 days of logs. A "meal" is whatever you added in one go.
+const mealSig=items=>items.map(i=>i.n+'×'+i.x).sort().join('|');
+const mealName=items=>items.map(i=>i.n.replace(/\s*\(.*?\)\s*/g,' ').trim()+(i.x!==1?' ×'+i.x:'')).join(', ');
+const mealK=items=>items.reduce((a,i)=>a+i.k*i.x,0),mealP=items=>items.reduce((a,i)=>a+i.pr*i.x,0);
+const strip=e=>({n:e.n,k:e.k,pr:e.pr,c:e.c,f:e.f,x:e.x,...(e.fi?{fi:e.fi}:{})});
+function groupsOn(d){const out=[],by={};(S.food[d]||[]).forEach((e,i)=>{if(e.auto)return;const g=e.g||('i'+i);if(!by[g]){by[g]={g,items:[],idx:[]};out.push(by[g])}by[g].items.push(e);by[g].idx.push(i)});return out}
+function recentMeals(){const map={};
+  for(let i=0;i<=45;i++){const d=addDays(TODAY,-i);groupsOn(d).forEach(gp=>{const sig=mealSig(gp.items);const m=map[sig]||(map[sig]={sig,items:gp.items.map(strip),n:0,last:d});m.n++;if(d>m.last)m.last=d})}
+  const pinned=new Set(S.meals.map(m=>m.sig));
+  const auto=Object.values(map).filter(m=>!pinned.has(m.sig)).map(m=>({...m,score:m.n*3-diffDays(m.last,TODAY)/5})).sort((a,b)=>b.score-a.score).slice(0,6);
+  return [...S.meals.map(m=>({...m,pin:true})),...auto]}
+const newG=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,5);
+function addMeal(items){const g=newG();items.forEach(i=>pushFood({...strip(i),g}));save()}
+function parseMeal(txt){
+  const out=[];txt.toLowerCase().split(/,|\+| and |\n| with /).map(x=>x.trim()).filter(Boolean).forEach(ch=>{
+    let best=null,score=0;[...FOODS,...S.myFoods].forEach(f=>{const s=(f.al||f.n.toLowerCase()).split(' ').filter(w=>w.length>2&&ch.includes(w)).length;if(s>score){score=s;best=f}});
+    if(!best)return;
+    let x=1;const n=ch.match(/(\d+(\.\d+)?)/);if(n)x=parseFloat(n[1]);
+    if(/\bhalf\b/.test(ch))x=(best.al||'').includes('bread')?2:0.5;if(/\bwhole\b/.test(ch)&&(best.al||'').includes('bread'))x=4;
+    if(/\b(big|large|huge)\b/.test(ch))x*=1.5;if(/\b(small|little)\b/.test(ch))x*=0.7;
+    if(best.n==='Dates'&&n)x=x/3;
+    out.push({f:best,x:Math.round(x*100)/100});
+  });return out;
+}
+
+/* ===================== Body ===================== */
+function chart(){
+  const s=trendSeries().filter(x=>diffDays(x.d,TODAY)<=56);
+  if(s.length<2)return `<div class="card flat stack" style="align-items:center;text-align:center;padding:22px"><svg viewBox="0 0 120 40" width="160" aria-hidden="true"><path d="M4 30 C30 28 40 12 60 16 S96 10 116 6" fill="none" stroke="var(--violet)" stroke-width="3" stroke-dasharray="5 5"/></svg><p class="small">Your trend line starts after 2 morning weigh-ins.</p></div>`;
+  const Wd=340,H=160,Lp=30,R=8,T=12,B=22,ceil=S.profile.ceiling;
+  let lo=Math.min(...s.map(x=>Math.min(x.kg,x.t))),hi=Math.max(...s.map(x=>Math.max(x.kg,x.t)));
+  if(ceil-hi<3)hi=Math.max(hi,ceil);lo=Math.floor(lo-0.5);hi=Math.ceil(hi+0.5);
+  const d0=s[0].d,span=Math.max(1,diffDays(d0,s[s.length-1].d));
+  const X=d=>Lp+(Wd-Lp-R)*diffDays(d0,d)/span,Y=v=>T+(H-T-B)*(hi-v)/(hi-lo);
+  const st=Math.max(1,Math.ceil((hi-lo)/4)),ticks=[];for(let v=lo;v<=hi;v+=st)ticks.push(v);
+  const path=s.map((x,i)=>(i?'L':'M')+X(x.d).toFixed(1)+' '+Y(x.t).toFixed(1)).join(' ');
+  const cs=S.profile.creatineStart;
+  return `<svg class="chart" viewBox="0 0 ${Wd} ${H}" role="img" aria-label="Weight trend">
+   ${ticks.map(v=>`<line x1="${Lp}" x2="${Wd-R}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)"/><text x="${Lp-6}" y="${Y(v)+3}" text-anchor="end">${v}</text>`).join('')}
+   ${ceil<=hi&&ceil>=lo?`<line x1="${Lp}" x2="${Wd-R}" y1="${Y(ceil)}" y2="${Y(ceil)}" stroke="var(--bad)" stroke-dasharray="4 4" stroke-width="1.5"/><text x="${Wd-R}" y="${Y(ceil)-4}" text-anchor="end" style="fill:var(--bad)">ceiling ${ceil}</text>`:''}
+   ${cs&&cs>=d0?`<line x1="${X(cs)}" x2="${X(cs)}" y1="${T}" y2="${H-B}" stroke="var(--violet)" stroke-dasharray="3 3"/><text x="${X(cs)+4}" y="${T+8}" style="fill:var(--violet)">creatine</text>`:''}
+   <path d="${path} L${X(s[s.length-1].d)} ${H-B} L${X(d0)} ${H-B} Z" fill="var(--accent)" fill-opacity=".12"/>
+   <path d="${path}" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linejoin="round"/>
+   ${s.map(x=>`<circle cx="${X(x.d)}" cy="${Y(x.kg)}" r="3" fill="var(--muted)" fill-opacity=".6"/>`).join('')}
+   <circle cx="${X(s[s.length-1].d)}" cy="${Y(s[s.length-1].t)}" r="5" fill="var(--accent)" stroke="var(--surface)" stroke-width="2"/>
+   <text x="${Lp}" y="${H-6}">${fmtDate(d0)}</text><text x="${Wd-R}" y="${H-6}" text-anchor="end">${fmtDate(s[s.length-1].d)}</text></svg>`;
+}
+// Waist change over roughly the last 4 weeks (reference entry 3-6 weeks before the latest one).
+function waist4w(){const wa=S.waist;if(wa.length<2)return null;const last=wa[wa.length-1];
+  const c=wa.filter(x=>{const g=diffDays(x.d,last.d);return g>=21&&g<=42});if(!c.length)return null;
+  const ref=c.reduce((a,b)=>Math.abs(diffDays(b.d,last.d)-28)<Math.abs(diffDays(a.d,last.d)-28)?b:a);return {d:last.cm-ref.cm,from:ref.d}}
+function checkin(){
+  const p=S.profile,rate=weeklyRate(),w4=waist4w();
+  const band={gain:[0.15,0.35],recomp:[-0.1,0.1],cut:[-0.7,-0.3]}[p.goal];
+  const crNew=p.creatineStart&&diffDays(p.creatineStart,TODAY)<21;
+  const n=countedW().length;
+  if(rate==null||n<7)return {txt:`Needs a week of morning weigh-ins. Your first check-in unlocks after 7 (${n} so far).`,adj:0};
+  if(p.ciLast&&diffDays(p.ciLast,TODAY)<7)return {txt:`You applied ${p.ciAdj>0?'+':''}${p.ciAdj} kcal on ${fmtDate(p.ciLast)}. Give it a week: next check-in ${fmtDate(addDays(p.ciLast,7))}. Right now: ${rate>0?'+':''}${rate.toFixed(2)} kg/week.`,adj:0,wait:true};
+  if(w4&&w4.d>1.5&&p.goal!=='cut')return {txt:`Waist up ${w4.d.toFixed(1)} cm since ${fmtDate(w4.from)}. Too much of the gain is fat. Drop 200 kcal.`,adj:-200};
+  if(rate>band[1]&&!crNew)return {txt:`Gaining ${rate.toFixed(2)} kg/week, faster than ${band[1]}. Drop 150 kcal.`,adj:-150};
+  if(rate>band[1]&&crNew)return {txt:`Gaining ${rate.toFixed(2)} kg/week, but you started creatine recently. Mostly water. No change.`,adj:0};
+  if(rate<band[0])return {txt:`${rate.toFixed(2)} kg/week, slower than ${band[0]}. Add 150 kcal.`,adj:150};
+  return {txt:`${rate>0?'+':''}${rate.toFixed(2)} kg/week, right on target. Keep going.`,adj:0};
+}
+/* ===================== Body fat estimate ===================== */
+// Two tape formulas plus what you see in the mirror/photo. Each alone is off by 3–4%; the trend matters more than the number.
+// RFM (Woolcott 2018, men): 64 − 20 × height/waist. US Navy (Hodgdon & Beckett 1984, men, cm).
+const BF_LOOKS=[[9.5,'8–11%','Six-pack clearly visible'],[13,'12–14%','Upper abs show, lower belly soft'],[16,'15–17%','Faint ab outline in good light'],[19.5,'18–21%','No abs, belly mostly flat'],[23.5,'22–25%','Soft belly, love handles'],[28,'26%+','Belly sticks out past the chest']];
+const lastOf=a=>a&&a.length?a[a.length-1]:null;
+function bfAt(w,n){const h=S.profile.height;if(!w)return {};const rfm=64-20*h/w,navy=n&&w-n>0?495/(1.0324-0.19077*Math.log10(w-n)+0.15456*Math.log10(h))-450:null;return {rfm,navy}}
+function bfNow(){const w=lastOf(S.waist),n=lastOf(S.neck),lk=Object.entries(S.bfLook).sort().pop();const t=bfAt(w&&w.cm,n&&n.cm);
+  const look=lk?BF_LOOKS[lk[1]]:null,ai=S.bfAI&&Object.entries(S.bfAI).sort().pop(),parts=[t.rfm,t.navy,look&&look[0],ai&&diffDays(ai[0],TODAY)<=45?ai[1].est:null].filter(v=>v!=null&&isFinite(v));
+  return {...t,look,lookD:lk&&lk[0],est:parts.length?parts.reduce((a,b)=>a+b,0)/parts.length:null,n:parts.length}}
+function bfCard(){const b=bfNow(),w0=S.waist[0],w1=lastOf(S.waist),dRfm=w0&&w1&&w0!==w1?bfAt(w1.cm).rfm-bfAt(w0.cm).rfm:null;
+  const pick=lk=>`<div class="looks">${BF_LOOKS.map((l,i)=>`<button class="${S.bfLook[TODAY]===i?'on':''}" data-a="bflook" data-i="${i}"><b>${l[1]}</b><span>${l[2]}</span></button>`).join('')}</div>`;
+  return `<div class="card stack" id="bfcard">
+   <div class="row between"><h3>Body fat estimate</h3>${b.est!=null?`<span class="chip hot">~${Math.round(b.est)}%</span>`:''}</div>
+   ${b.est!=null?`<div class="grid3">
+     <div class="stat"><p class="label">Waist only</p><div class="v">${b.rfm!=null?b.rfm.toFixed(0):'–'}<small>%</small></div></div>
+     <div class="stat"><p class="label">Waist + neck</p><div class="v">${b.navy!=null?b.navy.toFixed(0):'–'}<small>%</small></div></div>
+     <div class="stat"><p class="label">By eye</p><div class="v" style="font-size:22px">${b.look?b.look[1]:'–'}</div></div></div>
+    <p class="small">Best guess: <b>${Math.round(b.est-3)}–${Math.round(b.est+3)}%</b>${b.n<3?`. Add ${[b.navy==null?'your neck':'',b.look?'':'a mirror check'].filter(Boolean).join(' and ')} to tighten it.`:'.'}${dRfm!=null?` Waist says ${dRfm>0?'+':''}${dRfm.toFixed(1)}% since ${fmtDate(w0.d)}.`:''}</p>`
+   :`<p class="small muted">Log your waist (above) to get a first number.</p>`}
+   <div class="row"><input id="nkIn" class="num grow" type="number" inputmode="decimal" step="0.5" placeholder="Neck cm" aria-label="Neck in cm, just below the Adam's apple"><button class="btn sm ink" data-a="logneck">+</button></div>
+   ${lastOf(S.neck)?`<p class="small muted">Neck ${lastOf(S.neck).cm} cm (${fmtDate(lastOf(S.neck).d)}). Measure just below the Adam's apple, monthly.</p>`:'<p class="small muted">Neck: tape just below the Adam\'s apple. Monthly is enough.</p>'}
+   <p class="label">Mirror or photo check: which looks most like you today?</p>${pick()}
+   <p class="small muted">Same light, same time of day, relaxed. Tape formulas run high on lean, muscular people and low on skinny-fat builds, so watch the trend, not the number.</p>${hook('bfAI')}
+  </div>`}
+
+/* ===================== Calisthenics ===================== */
+function spark(arr){if(!arr||arr.length<2)return '';const vs=arr.map(x=>x.v),lo=Math.min(...vs),hi=Math.max(...vs)||1,Wd=200,H=46;
+  const pts=arr.map((x,i)=>[i/(arr.length-1)*(Wd-8)+4,H-6-(hi===lo?.5:(x.v-lo)/(hi-lo))*(H-14)]);
+  return `<svg class="spark" viewBox="0 0 ${Wd} ${H}" preserveAspectRatio="none" aria-hidden="true"><polyline points="${pts.map(p=>p.join(',')).join(' ')}" fill="none" stroke="var(--violet)" stroke-width="2.5"/>${pts.map(p=>`<circle cx="${p[0]}" cy="${p[1]}" r="3" fill="var(--violet)"/>`).join('')}</svg>`}
+const best=id=>{const l=S.circLog.filter(x=>x.id===id);if(!l.length)return null;const c=CIRCUITS.find(x=>x.id===id);return c.type==='amrap'?Math.max(...l.map(x=>x.score)):Math.min(...l.map(x=>x.score))};
+
+/* ===================== Circuit runner ===================== */
+const ladderSeq=peak=>[...Array(peak).keys()].map(i=>i+1).concat([...Array(peak-1).keys()].map(i=>peak-1-i));
+function overHTML(){
+  const r=UI.run;if(!r)return UI.cele&&UI.cele.length?celeHTML():'';const c=r.c;
+  const el=Math.floor((Date.now()-r.t0)/1000);
+  if(r.phase==='done'){const score=c.type==='amrap'?r.rounds+' rounds':hm(r.score/60);return `<div class="over"><div class="inner" style="justify-content:center;text-align:center"><p class="label">Done</p><h1 style="font-size:64px">${c.n}</h1><div class="clock" style="font-size:96px">${score}</div>${c.id==='cindy'?`<p class="muted">Tom Holland's reported best: 27 rounds.</p>`:''}<button class="btn primary block" data-a="runclose">Close</button></div></div>`}
+  if(c.type==='amrap'){const left=Math.max(0,Math.ceil((r.end-Date.now())/1000));return `<div class="over work"><div class="inner">
+    <div class="row between"><p class="label">${c.n} · ${c.min} min AMRAP</p><button class="btn sm" data-a="runfinish">End</button></div>
+    <div class="clock">${Math.floor(left/60)}:${pad(left%60)}</div>
+    <div class="moves">${c.st.map(([n,reps,g])=>`<div>${gMedia(g,n)}<b>${reps}</b><span class="small">${n}</span></div>`).join('')}</div>
+    <div class="row between"><span class="label">Rounds</span><span class="num" style="font-size:56px">${r.rounds}</span></div>
+    <button class="btn big block" data-a="amrapround">+1 round</button>${r.rounds?`<button class="btn sm" data-a="amrapundo">Undo round</button>`:''}</div></div>`}
+  if(c.type==='ladder'){const seq=r.seq,k=seq[r.step];return `<div class="over work"><div class="inner">
+    <div class="row between"><p class="label">Round ${r.step+1}/${seq.length} · ${Math.floor(el/60)}:${pad(el%60)}</p><button class="btn sm" data-a="runfinish">End</button></div>
+    <h1 style="font-size:52px">Round ${r.step+1}</h1>
+    <div class="moves">${c.st.map(([n,mult,g])=>`<div>${gMedia(g,n)}<b>${mult*k}</b><span class="small">${n}</span></div>`).join('')}</div>
+    <div class="ladder">${seq.map((_,i)=>`<i class="${i<r.step?'ok':''}" style="${i<r.step?'background:var(--accent-ink)':''}"></i>`).join('')}</div>
+    <button class="btn big block" data-a="ladnext">Round done</button></div></div>`}
+  const st=c.st[r.i],left=Math.max(0,Math.ceil((r.end-Date.now())/1000));
+  const work=r.phase==='work',next=r.phase==='ready'?c.st[0]:r.i+1<c.st.length?c.st[r.i+1]:c.st[0];
+  const label=work?st[0]:r.phase==='rr'?'Round rest · next: '+next[0]:r.phase==='ready'?'Get ready · '+next[0]:'Rest · next: '+next[0];
+  return `<div class="over ${work?'work':''}"><div class="inner">
+   <div class="row between"><p class="label">Round ${r.round}/${c.rounds} · move ${r.i+1}/${c.st.length}</p><button class="btn sm" data-a="runclose">End</button></div>
+   <h1 style="font-size:44px">${label}</h1>
+   <div style="max-width:360px;width:100%;margin:0 auto">${work?gMedia(st[2],st[0],'big'):gMedia(next[2],next[0],'big')}</div>
+   <div class="clock">${left}</div>
+   <div class="row"><button class="btn grow" data-a="runpause">${r.paused?'Resume':'Pause'}</button><button class="btn grow" data-a="runskip">Skip</button></div>
+  </div></div>`;
+}
+function renderOver(){$('#over').innerHTML=overHTML()}
+function runPhase(phase,secs){const r=UI.run;r.phase=phase;r.end=Date.now()+secs*1000;beep(phase==='work'?1040:660,phase==='work'?260:160);buzz(phase==='work'?[80,60,80]:60);renderOver()}
+function runAdvance(){const r=UI.run,c=r.c;
+  if(r.phase==='work'){if(r.i+1<c.st.length)runPhase('rest',c.rest);else if(r.round<c.rounds)runPhase('rr',c.rr);else finishRun(Math.round((Date.now()-r.t0)/1000))}
+  else{if(r.phase==='rr'){r.round++;r.i=0}else if(r.phase!=='ready')r.i++;runPhase('work',c.work)}}
+function finishRun(score){const r=UI.run;r.phase='done';r.score=score;keepAwake(false);beep(1320,400);
+  if(r.c.type==='amrap')S.circLog.push({id:r.c.id,d:TODAY,score:r.rounds});
+  else if(r.c.type!=='ladder'||r.step>=r.seq.length)S.circLog.push({id:r.c.id,d:TODAY,score,peak:r.peak});
+  save();renderOver()}
+setInterval(()=>{const r=UI.run;
+  if(r&&r.phase!=='done'){
+    if(r.c.type==='amrap'){if(Date.now()>=r.end)finishRun(0);else{const left=Math.ceil((r.end-Date.now())/1000),el=$('.over .clock');if(el)el.textContent=Math.floor(left/60)+':'+pad(left%60)}}
+    else if(r.c.type==='ladder'){const el=$('.over .label');if(el){const s=Math.floor((Date.now()-r.t0)/1000);el.textContent=`Round ${r.step+1}/${r.seq.length} · ${Math.floor(s/60)}:${pad(s%60)}`}}
+    else if(!r.paused){const left=Math.ceil((r.end-Date.now())/1000);if(left<=3&&left>0&&left!==r.lastBeep){r.lastBeep=left;beep(520,90)}if(Date.now()>=r.end)runAdvance();else{const el=$('.over .clock');if(el)el.textContent=Math.max(0,left)}}}
+  if(UI.hold){const el=$('#holdclock');if(el)el.textContent=((Date.now()-UI.hold.t0)/1000).toFixed(1)}
+  if(UI.timerEnd){renderTimer();if(Date.now()>UI.timerEnd+8000){UI.timerEnd=0;renderTimer()}}},250);
+
+/* ===================== Sheets ===================== */
+function swapList(ctx){
+  const q=(UI.swapQ||'').toLowerCase();
+  let cur=null;if(ctx.mode==='active')cur=def(S.active.list[ctx.x].id);if(ctx.mode==='plan')cur=def(S.program.find(d=>d.id===ctx.day).ex[ctx.x].x);
+  const pm=cur?primary(cur):null;
+  const all=Object.keys({...LIB,...S.customEx}).map(def).filter(d=>!cur||d.id!==cur.id);
+  const match=all.filter(d=>q?d.n.toLowerCase().includes(q):pm?primary(d)===pm:true);
+  const rest=q||!pm?[]:all.filter(d=>primary(d)!==pm);
+  const row=d=>`<button class="food" data-a="swappick" data-id="${d.id}"><div class="figbox" style="width:60px">${exMedia(d.id)}</div><div class="grow"><b>${esc(d.n)}</b><p class="small muted">${Object.keys(d.m).map(k=>MUSC[k]).join(', ')} · ${d.r[0]}–${d.r[1]} reps</p></div></button>`;
+  return `${pm?`<p class="label">Same muscle: ${MUSC[pm]}</p>`:''}<div>${match.map(row).join('')||'<p class="small muted">No matches.</p>'}</div>${rest.length?`<details><summary class="label" style="padding:8px 0">All other exercises</summary><div>${rest.map(row).join('')}</div></details>`:''}`;
+}
+function sheetHTML(){
+  const s=UI.sheet;if(!s)return '';let body='';
+  if(s.kind==='swap'){body=`<h2>${s.mode.endsWith('add')?'Add exercise':'Swap exercise'}</h2>${s.mode.startsWith('plan')?'<p class="small muted">Saved to your plan: every future session changes.</p>':`<label class="pill-toggle" for="swKeep" style="cursor:pointer"><div class="grow"><b>Also save to plan</b><p class="small muted">${UI.swapKeep?'Every future session changes too.':'Off: today only, your plan stays the same.'}</p></div><input id="swKeep" type="checkbox" style="width:22px;height:22px" ${UI.swapKeep?'checked':''} data-c="swapKeep"></label>`}
+   <input id="swq" type="search" placeholder="Search, e.g. preacher, smith, pendulum" value="${esc(UI.swapQ||'')}" data-c="swapq" aria-label="Search exercises">
+   ${swapList(s)}
+   <div class="card flat stack" style="padding:12px"><p class="small"><b>Not listed?</b> Create it.</p>
+    <input id="cxN" placeholder="Exercise name"><select id="cxM" aria-label="Main muscle">${Object.entries(MUSC).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}</select>
+    <button class="btn" data-a="swapcustom">Create and use</button></div>`}
+  if(s.kind==='exlib'){const q=(UI.libQ||'').toLowerCase(),mf=UI.libM||'',recs=records();
+   const all=Object.keys({...LIB,...S.customEx}).map(def).filter(d=>q?d.n.toLowerCase().includes(q):!mf||primary(d)===mf).sort((a,b)=>(recs[b.id]?1:0)-(recs[a.id]?1:0)||a.n.localeCompare(b.n));
+   body=`<h2>Exercises</h2><input id="libq" type="search" placeholder="Search ${Object.keys({...LIB,...S.customEx}).length} exercises" value="${esc(UI.libQ||'')}" data-c="libq" aria-label="Search exercises">
+    ${q?'':`<div class="row wrap" style="gap:6px"><button class="chip${!mf?' on':''}" data-a="libm" data-m="">All</button>${Object.entries(MUSC).map(([k,v])=>`<button class="chip${mf===k?' on':''}" data-a="libm" data-m="${k}">${v}</button>`).join('')}</div>`}
+    <div>${all.map(d=>{const r=recs[d.id];return `<button class="food" data-a="exinfo" data-id="${d.id}"><div class="figbox" style="width:56px">${exMedia(d.id)}</div><div class="grow"><b>${esc(d.n)}</b><p class="small muted">${Object.keys(d.m).map(k=>MUSC[k]).join(', ')}</p></div>${r?`<span class="small muted" style="text-align:right">best<br><b class="num" style="font-size:15px">${r.kg}×${r.r}</b></span>`:''}</button>`}).join('')||'<p class="small muted">No matches.</p>'}</div>
+    <p class="small muted">Done ones first. Tap any exercise for its form cues and your progress.</p>`}
+  if(s.kind==='exinfo'){const d=def(s.id),h=exHistory(s.id),r=records()[s.id],kgd=h.some(x=>x.kgd);
+   body=`${s.back?`<button class="btn sm ghost" data-a="exlib" style="align-self:flex-start">← All exercises</button>`:''}<h2>${esc(d.n)}</h2>
+    <div class="figbox" style="width:100%;max-width:260px;align-self:center">${exMedia(d.id)}</div>
+    <p class="small muted">${Object.entries(d.m).sort((a,b)=>b[1]-a[1]).map(([k,v])=>MUSC[k]+(v<1?' (some)':'')).join(', ')} · ${d.r[0]}–${d.r[1]} reps · rest ${Math.round(d.rest/60*2)/2} min</p>
+    ${NOTES[d.id]?`<p class="small">${NOTES[d.id]}</p>`:''}
+    <details><summary class="small" style="color:var(--violet);font-weight:700">Form cues</summary><ul class="cues">${(CUES[d.g]||[]).map(c=>`<li>${c}</li>`).join('')}</ul></details>
+    <div class="card stack"><div class="row between"><p class="label">${kgd?'Estimated 1-rep max':'Best reps'}</p>${r?`<span class="chip good">Best ${r.kg}×${r.r}</span>`:''}</div>${h.length?miniChart(h,kgd?'kg':'reps'):'<p class="small muted">Not logged yet.</p>'}</div>
+    ${h.length?`<div class="list">${h.slice(-8).reverse().map(x=>`<div class="li small"><span class="grow">${fmtDate(x.d)}</span><span>${x.sets.map(([kg,rp])=>(kg?kg+'×':'')+rp).join(', ')}</span></div>`).join('')}</div>`:''}`}
+  if(s.kind==='wlog'){const e=s.e,p=S.program.find(x=>x.id===e.day);
+   body=`<h2>${p?esc(p.name):'Workout'}</h2>
+    <div class="field"><label class="label" for="lgD">Date</label><input id="lgD" type="date" max="${TODAY}" value="${e.d}" data-c="lgdate"></div>
+    ${Object.entries(e.ex).map(([id,sets])=>{const d=def(id);return `<div class="card flat stack" style="padding:12px"><b class="small">${esc(d.n)}</b>
+     <div class="setrow small muted"><span></span><span style="text-align:center">${unitLabel(d.u)}</span><span style="text-align:center">reps</span><span></span></div>
+     ${sets.map(([kg,r],i)=>`<div class="setrow"><span class="small muted" style="text-align:center">${i+1}</span><input class="num" type="number" inputmode="decimal" step="0.5" value="${kg||''}" placeholder="${d.u==='bw'?'BW':'0'}" data-c="lgset" data-id="${id}" data-i="${i}" data-k="0" aria-label="${esc(d.n)} set ${i+1} kg"><input class="num" type="number" inputmode="numeric" value="${r||''}" placeholder="${d.r[0]}–${d.r[1]}" data-c="lgset" data-id="${id}" data-i="${i}" data-k="1" aria-label="${esc(d.n)} set ${i+1} reps"><button class="icon-btn s" data-a="lgrm" data-id="${id}" data-i="${i}" aria-label="Remove set ${i+1}">${I.x}</button></div>`).join('')}
+     <button class="btn sm ghost" data-a="lgadd" data-id="${id}" style="align-self:flex-start">+ Set</button></div>`}).join('')}
+    <p class="small muted">Changes save as you type. Sets with no reps are dropped when you close this.</p>
+    ${s.confirm?`<div class="row"><button class="btn grow" data-a="lgdelno">Keep it</button><button class="btn grow" style="color:var(--bad)" data-a="lgdelyes">Delete session</button></div>`:`<button class="btn ghost" data-a="lgdel" style="color:var(--bad)">Delete this session</button>`}`}
+  if(s.kind==='wpast'){body=`<h2>Log a past workout</h2><p class="small muted">Pick the day you trained. You fill in the numbers next.</p>
+    <div class="list">${S.program.map(p=>`<button class="li" data-a="wpastgo" data-id="${p.id}" style="width:100%;text-align:left"><span class="grow"><b>${esc(p.name)}</b><br><span class="small muted">${p.ex.length} exercises</span></span><span class="chip">Pick</span></button>`).join('')}</div>`}
+  if(s.kind==='fedit'){const e=(S.food[s.d]||[])[s.i];if(!e){UI.sheet=null;return ''}
+   body=`<h2>${esc(e.n)}</h2><p class="small muted">Amount, compared with what you first logged.</p>
+    <div class="row wrap" style="gap:6px">${[0.5,0.75,1,1.25,1.5,2].map(x=>`<button class="chip${e.x===x?' on':''}" data-a="fx" data-x="${x}">×${x}</button>`).join('')}</div>
+    <div class="row"><input id="fxI" class="num" type="number" inputmode="decimal" step="0.05" value="${e.x}" data-c="fx" aria-label="Amount multiplier" style="width:110px"><span class="small muted grow">× the original</span></div>
+    <div class="grid3"><div class="stat"><p class="label">kcal</p><div class="v">${fmt(e.k*e.x)}</div></div><div class="stat"><p class="label">Protein</p><div class="v">${Math.round(e.pr*e.x)}<small>g</small></div></div><div class="stat"><p class="label">C / F</p><div class="v" style="font-size:26px">${Math.round(e.c*e.x)}/${Math.round(e.f*e.x)}</div></div></div>
+    <details><summary class="small" style="color:var(--violet);font-weight:700">Numbers look wrong? Set them yourself</summary>
+     <div class="grid2" style="margin-top:8px"><div class="field"><label class="label" for="feK">kcal at ×1</label><input id="feK" class="num" type="number" inputmode="numeric" value="${Math.round(e.k)}" data-c="feset" data-f="k"></div><div class="field"><label class="label" for="feP">Protein g at ×1</label><input id="feP" class="num" type="number" inputmode="numeric" value="${Math.round(e.pr)}" data-c="feset" data-f="pr"></div></div>
+     <p class="tiny muted" style="margin-top:6px">Changing kcal scales carbs and fat with it.</p></details>
+    <div class="grid2"><button class="btn" data-a="delfood" style="color:var(--bad)">Remove</button><button class="btn primary" data-a="closesheet">Done</button></div>`}
+  if(s.kind==='phcred'){body=`<h2>Photo credits</h2><p class="small muted">Skill photos from Wikimedia Commons, used under their licences.</p><div class="stack" style="gap:6px">${PHCRED.map(([f,by,lic,u])=>`<p class="small"><a href="${u}" target="_blank" rel="noopener">${esc(f)}</a> · ${esc(by||'unknown')} · ${esc(lic)}</p>`).join('')}</div>`}
+  if(s.kind==='exopt'){const x=S.active.list[s.x],d=def(x.id);body=`<h2>${d.n}</h2>
+   <div class="grid2"><button class="btn" data-a="exmove" data-d="-1" ${s.x===0?'disabled':''}>Move up</button><button class="btn" data-a="exmove" data-d="1" ${s.x===S.active.list.length-1?'disabled':''}>Move down</button></div>
+   <button class="btn" data-a="exinfo" data-id="${x.id}">Progress and form cues</button>
+   <button class="btn" data-a="swapopen" data-mode="active" data-x="${s.x}">Swap for another exercise</button>
+   <button class="btn" data-a="exremove" style="color:var(--bad)">Remove from today</button>`}
+  if(s.kind==='editday'){const p=S.program.find(d=>d.id===s.day);body=`<h2>Edit ${p.name}</h2><p class="small muted">Permanent: every change here saves to your plan for all future ${esc(p.name)} sessions.${S.active&&S.active.day===p.id?' Today\'s session in progress keeps its own list.':''}</p>
+   <div class="field"><label class="label" for="dName">Name</label><input id="dName" value="${esc(p.name)}" data-c="dayname"></div>
+   <div class="field"><span class="label">Day</span><div class="seg">${[1,2,3,4,5,6,0].map(dw=>`<button class="${p.dow===dw?'on':''}" data-a="daydow" data-v="${dw}">${DOW[dw][0]}</button>`).join('')}</div></div>
+   <div class="list">${p.ex.map((e,i)=>{const d=def(e.x);return `<div class="li"><div class="figbox" style="width:56px">${exMedia(d.id)}</div><div class="grow"><b class="small">${d.n}</b><div class="row" style="gap:4px;margin-top:4px"><button class="icon-btn s" data-a="pmove" data-x="${i}" data-d="-1" aria-label="Move up">↑</button><button class="icon-btn s" data-a="pmove" data-x="${i}" data-d="1" aria-label="Move down">↓</button><button class="icon-btn s" data-a="swapopen" data-mode="plan" data-x="${i}" aria-label="Swap">⇄</button><button class="icon-btn s" data-a="prm" data-x="${i}" aria-label="Remove">${I.x}</button></div></div>
+     <div class="stepper"><button data-a="psets" data-x="${i}" data-d="-1" aria-label="Fewer sets">−</button><b>${e.s}</b><button data-a="psets" data-x="${i}" data-d="1" aria-label="More sets">+</button></div></div>`}).join('')}</div>
+   <button class="btn" data-a="swapopen" data-mode="planadd">+ Add exercise</button>
+   <p class="small muted">${p.ex.length} exercises · ${p.ex.reduce((a,e)=>a+e.s,0)} sets · ~${Math.round(p.ex.reduce((a,e)=>a+e.s,0)*3.5+10)} min. The muscle map updates as you edit.</p>
+   <button class="btn ghost" data-a="dayreset">Reset this day to the default</button>`}
+  if(s.kind==='food'){const f=s.f;body=`<h2>${esc(f.n)}</h2><p class="small muted">${esc(f.p)} · ${fmt(f.k)} kcal · ${f.pr} g protein${f.url?` · <a href="${esc(f.url)}" target="_blank" rel="noopener" style="color:var(--violet)">source</a>`:''}</p>
+   <div class="seg">${[[0.5,'½'],[1,'1'],[1.5,'1½'],[2,'2']].map(([x,l])=>`<button class="${s.x===x?'on':''}" data-a="portion" data-x="${x}">${l}</button>`).join('')}</div>
+   <div class="grid3"><div class="stat"><p class="label">kcal</p><div class="v">${fmt(f.k*s.x)}</div></div><div class="stat"><p class="label">Protein</p><div class="v">${Math.round(f.pr*s.x)}<small>g</small></div></div><div class="stat"><p class="label">C / F</p><div class="v" style="font-size:26px">${Math.round(f.c*s.x)}/${Math.round(f.f*s.x)}</div></div></div>
+   <button class="btn primary block" data-a="addfood">Add to today</button>`}
+  if(s.kind==='food100'){const r=s.r,x=(s.g||0)/100;body=`<h2>${esc(r.n)}</h2><p class="small muted">${r.src==='usda'?'USDA lab data':'Open Food Facts label'} · per 100 g: ${fmt(r.k)} kcal · ${r.pr.toFixed(1)} P · ${r.c.toFixed(1)} C · ${r.f.toFixed(1)} F${r.fi?' · '+r.fi.toFixed(1)+' fiber':''}</p>
+   <div class="row"><input id="dbG" class="num" type="number" inputmode="decimal" value="${s.g}" data-c="dbg" aria-label="Grams eaten" style="width:110px"><span class="small muted grow">grams</span></div>
+   <div class="row wrap" style="gap:6px">${[...new Set([r.serv,50,100,150,200,300].filter(Boolean))].map(g=>`<button class="chip${s.g===g?' on':''}" data-a="dbg" data-g="${g}">${g} g${g===r.serv?' (1 serving)':''}</button>`).join('')}</div>
+   <div class="grid3"><div class="stat"><p class="label">kcal</p><div class="v">${fmt(r.k*x)}</div></div><div class="stat"><p class="label">Protein</p><div class="v">${Math.round(r.pr*x)}<small>g</small></div></div><div class="stat"><p class="label">C / F</p><div class="v" style="font-size:26px">${Math.round(r.c*x)}/${Math.round(r.f*x)}</div></div></div>
+   <div class="grid2"><button class="btn primary" data-a="dbadd">Add</button><button class="btn" data-a="dbadd" data-keep="1">Add + save to list</button></div>
+   <p class="small muted">Weigh it cooked if the name says cooked, raw if it says raw.</p>`}
+  if(s.kind==='custom'){body=`<h2>Custom item</h2>
+   <div class="field"><label class="label" for="cfN">Name</label><input id="cfN" placeholder="e.g. Crunchwrap Supreme"></div>
+   <div class="field"><label class="label" for="cfP">Portion</label><input id="cfP" placeholder="e.g. 1 regular"></div>
+   <div class="grid2">${[['cfK','kcal'],['cfPr','Protein g'],['cfC','Carbs g'],['cfF','Fat g']].map(([id,l])=>`<div class="field"><label class="label" for="${id}">${l}</label><input id="${id}" class="num" type="number" inputmode="numeric"></div>`).join('')}</div>
+   <div class="field"><label class="label" for="cfS">Where the numbers come from</label><select id="cfS"><option value="">My estimate</option><option value="label">Package label</option><option value="official">Official restaurant site</option></select></div>
+   <div class="field"><label class="label" for="cfU">Source link</label><input id="cfU" type="url" placeholder="https://"></div>
+   <button class="btn primary block" data-a="savecustom">Save and add to today</button>`}
+  if(s.kind==='wconfirm'){body=`<h2>${s.kg} kg at ${s.t}</h2>
+   <p class="small">It's outside the morning window. Did you weigh right after waking, after the toilet, before any food or water?</p>
+   <div class="row"><button class="btn grow primary" data-a="wyes">Yes, fasted</button><button class="btn grow" data-a="wno">No, I've eaten</button></div>
+   <p class="small muted">Food and water add 1-2 kg by evening. Non-fasted weigh-ins are kept but left out of the trend and check-ins.</p>`}
+  if(s.kind==='wedit'){const ws=[...S.weights].filter(w=>!w.sample).sort((a,b)=>a.d<b.d?1:-1);body=`<h2>Weigh-ins</h2>
+   <div class="card stack"><p class="label">Add or replace a day</p>
+    <div class="row"><input id="wdD" type="date" max="${TODAY}" value="${addDays(TODAY,-1)}" aria-label="Date" style="flex:1.3"><input id="wdK" class="num" type="number" inputmode="decimal" step="0.1" placeholder="kg" aria-label="Weight in kg" style="flex:1"></div>
+    <label class="row" style="gap:8px"><input id="wdF" type="checkbox" checked style="width:20px;height:20px"><span class="small">Fasted morning weigh-in</span></label>
+    <button class="btn primary" data-a="wadd">Save</button></div>
+   <div class="stack">${ws.map(w=>`<div class="row between card flat" style="padding:10px 12px"><div><b>${w.kg} kg</b> <span class="small muted">${fmtDate(w.d)}${w.t?' · '+w.t:''}</span></div>
+     <div class="row" style="gap:6px"><button class="chip ${w.fasted===false?'warn':'good'}" data-a="wtog" data-d="${w.d}">${w.fasted===false?'Not fasted':'Fasted'}</button><button class="icon-btn s" data-a="wdel" data-d="${w.d}" aria-label="Delete ${fmtDate(w.d)}">${I.x}</button></div></div>`).join('')||'<p class="small muted">No weigh-ins yet.</p>'}</div>
+   <p class="small muted">Tap Fasted / Not fasted to switch. Only fasted ones count toward the trend.</p>`}
+  if(s.kind==='steps'){body=`<h2>Steps today</h2><input id="stIn" class="num" type="number" inputmode="numeric" placeholder="e.g. 6500" aria-label="Steps"><button class="btn primary block" data-a="logsteps">Save</button>${hook('steps')}`}
+  if(s.kind==='max'){const m=MOVES.find(x=>x.id===s.m),h=S.gtg.max[m.id]||[];body=`<h2>${m.n}: ${m.u==='s'?'best hold':'max test'}</h2><p class="small">${m.u==='s'?'Fresh, forearms down, one straight line. Stop the clock when your hips sag or drop.':'Fresh, after a warm-up, one all-out set with clean reps only.'}</p>
+   ${m.u==='s'?`<div class="holdclock" id="pclock">${UI.pt?Math.floor((Date.now()-UI.pt)/1000):s.v||0}</div><button class="btn block" data-a="ptime">${UI.pt?'Stop':'Start clock'}</button>`:''}
+   <input id="mxIn" class="num" type="number" inputmode="numeric" placeholder="${m.u==='s'?'seconds':'reps'}" value="${s.v||''}" aria-label="Max"><button class="btn primary block" data-a="savemax" data-m="${m.id}">Save</button>
+   ${h.length?`<div class="list">${h.slice().reverse().slice(0,8).map(x=>`<div class="li small"><span class="grow">${fmtDate(x.d)}${x.src==='set'?' · daily set':x.src==='gym'?' · in the gym':''}</span><b>${fmtV(m.id,x.v)}</b></div>`).join('')}</div>`:''}`}
+  if(s.kind==='remind'){const r=S.gtg.remind;body=`<h2>Rep windows</h2>
+   <div class="grid2"><div class="field"><label class="label" for="rS">First</label><input id="rS" type="time" value="${r.start}" data-c="remind" data-f="start"></div><div class="field"><label class="label" for="rE">Last</label><input id="rE" type="time" value="${r.end}" data-c="remind" data-f="end"></div></div>
+   <div class="field"><span class="label">Gap after each set</span><div class="seg">${[60,90,120,180].map(v=>`<button class="${r.every===v?'on':''}" data-a="remindevery" data-v="${v}">${v<120?v+' min':v/60+' h'}</button>`).join('')}</div></div>
+   <p class="small muted">The first reminder comes at "First". After that, each one comes ${everyTxt(r.every)} after the last set you log, so nothing piles up while you're busy. ${hook('gtgNote')}</p>`}
+  if(s.kind==='circ'){const c=CIRCUITS.find(x=>x.id===s.id),o=s.o;
+   body=`<div class="row" style="gap:6px"><h2>${c.n}</h2>${c.tag?`<span class="tag v">${c.tag}</span>`:''}</div><p class="small muted">${c.d}</p>
+   <div class="list">${c.st.map(([n,reps,g])=>`<div class="li"><div class="figbox" style="width:64px">${gMedia(g,n)}</div><span class="grow"><b>${n}</b></span>${c.type!=='timed'?`<span class="num" style="font-size:22px">${c.type==='ladder'?reps+'×':reps}</span>`:''}</div>`).join('')}</div>
+   ${c.type==='amrap'?`<div class="field"><span class="label">Minutes</span><div class="seg">${[10,15,20].map(v=>`<button class="${o.min===v?'on':''}" data-a="circopt" data-k="min" data-v="${v}">${v}</button>`).join('')}</div></div>
+     <p class="small muted">Scale it: chin-ups or jumping pull-ups, knee push-ups. Log rounds as you finish each.</p>`:''}
+   ${c.type==='ladder'?`<div class="field"><span class="label">Peak round</span><div class="seg">${[5,7,10].map(v=>`<button class="${o.peak===v?'on':''}" data-a="circopt" data-k="peak" data-v="${v}">${v}${v===10?' (full)':v===5?' (half)':''}</button>`).join('')}</div></div>
+     <p class="small muted">Peak ${o.peak}: ${o.peak*o.peak} pull-ups, ${o.peak*o.peak*2} dips, ${o.peak*o.peak*3} push-ups, ${o.peak*o.peak*4} sit-ups, ${o.peak*o.peak*5} squats in total.</p>`:''}
+   ${c.type==='timed'?[['work','Work (s)',[30,40,45,60]],['rest','Rest (s)',[10,15,20,30]],['rounds','Rounds',[2,3,4,5]]].map(([k,l,opts])=>`<div class="field"><span class="label">${l}</span><div class="seg">${opts.map(v=>`<button class="${o[k]===v?'on':''}" data-a="circopt" data-k="${k}" data-v="${v}">${v}</button>`).join('')}</div></div>`).join(''):''}
+   <button class="btn primary block" data-a="runstart">Start</button>`}
+  if(s.kind==='sk')body=skSheet(s);
+  if(s.kind==='recap')body=recapSheet(s);
+  if(s.kind==='bigph'){const d=def(s.id);body=`${exMedia(s.id,'big')}<h2>${esc(d.n)}</h2><p class="small muted">${Object.keys(d.m).map(k=>MUSC[k]).join(', ')} · ${d.r[0]}–${d.r[1]} reps</p><ul class="cues">${(CUES[d.g]||[]).map(c=>`<li>${c}</li>`).join('')}</ul>${NOTES[s.id]?`<p class="small">${NOTES[s.id]}</p>`:''}`}
+  if(s.kind==='resched'){const p=dayForDate(s.d)||S.program.find(x=>x.id===s.id),bd=p?betterDays(s.d,p):[];body=`<h2>Move ${p?p.name:'session'}</h2>
+   <p class="small muted">Best days in the next week, ranked by recovery: no hitting the same muscles two days in a row.</p>
+   <div class="stack">${bd.map((b,i)=>`<button class="card stack" data-a="reschmove" data-from="${s.d}" data-to="${b.d}" data-id="${p.id}" data-past="${s.d<TODAY?1:''}" style="text-align:left;width:100%"><div class="row between"><h3>${fmtDate(b.d)}</h3><span class="chip ${b.clean?'good':'warn'}">${i===0?'Best':b.clean?'Clean':'Some overlap'}</span></div><p class="small">${b.why}</p></button>`).join('')||'<p class="small muted">No free day this week.</p>'}</div>
+   ${s.d>=TODAY?`<button class="btn ghost" data-a="reschskip" data-from="${s.d}">Skip it this week</button>`:''}
+   ${Object.keys(S.resched).some(d=>d>=addDays(TODAY,-1))?`<button class="btn ghost" data-a="reschreset">Undo all moves this week</button>`:''}`}
+  if(!body&&typeof sheetX==='function')body=sheetX(s);
+  return `<div class="sheet-bg" data-a="closesheet"><div class="sheet stack${s.kind==='plus'?' plus':''}" role="dialog" aria-modal="true"><div class="sheet-head"><span class="grab"></span><span></span><button class="icon-btn s" data-a="closesheet" aria-label="Close">${I.x}</button></div>${body}</div></div>`;
+}
+
+/* ===================== Exercise illustrations ===================== */
+// Line drawings: Everkinetic (github.com/everkinetic/data), CC BY-SA 4.0, start/end frames cross-fading.
+// Moves that set doesn't have (levers, planche, flag, handstands, L-sits...) use the drawn poses in poses.js.
+const ILL={incdb:'0080',mpress:'0066',dbpress:'0055',bbbench:'0042',incsm:'0081',incbb:'0043',cfly:'0048',pecdeck:'0056',dips:'0054',pullup:'0087',chinup:'0090',
+ pdwide:'0093',pdclose:'0096',csrow:'0029',cswide:'0029',crow:'0025',tbar:'0026',dbrow:'0024',mrow:'0025',pullover:'0092',dbsp:'0031',msp:'0004',
+ latr:'0018',clat:'0018',mlat:'0018',face:'0035',rdfly:'0032',revdeck:'0023',inccurl:'0214',hammer:'0227',dbcurl:'0224',bayes:'0247',preacher:'0239',ezcurl:'0226',
+ ccurl:'0212',spider:'0245',ohtri:'0193',rope:'0206',pd1:'0166',skull:'0170',jm:'0175',cgbench:'0049',kick:'0204',hack:'0123',pend:'0145',bbsquat:'0122',
+ lpress:'0127',bss:'0132',rdl:'0118',hipthrust:'0109',slcurl:'0119',lcurl:'0117',legext:'0142',calf:'0282',scalf:'0279',crunch:'0288',hlr:'p:hlr',abwheel:'0286',
+ decbench:'0042',smbench:'0042',incmach:'0081',dbfly:'0048',lowfly:'0048',pushups:'0077',dipmach:'0054',neutpd:'0096',sapd:'0093',mpd:'0093',sapull:'0092',bbrow:'0026',sealrow:'0029',
+ meadows:'0024',dl:'0118',hyper:'0118',shrug:'0024',ohp:'0004',smsp:'0004',arnold:'0031',frontr:'0018',uprow:'0018',crdfly:'0032',bbcurl:'0226',mcurl:'0239',concurl:'0224',revcurl:'0226',
+ ropeham:'0227',wcurl:'0224',barpd:'0206',vbarpd:'0206',revpd:'0206',dbohtri:'0193',ezohtri:'0193',ohtri1:'0193',dbskull:'0170',benchdip:'0162',diamond:'0188',smsq:'0122',frontsq:'0122',
+ goblet:'0122',beltsq:'0123',lunge:'0132',revlunge:'0132',stepup:'0132',sissy:'0142',dbrdl:'0118',sldl:'0118',gm:'0118',nordic:'0117',stlcurl:'0119',abduct:'0109',glutebr:'0109',cablekb:'0109',
+ lpcalf:'0282',smcalf:'0282',mcrunch:'0288',decsit:'0291',hkr:'p:hkr',chop:'0288'};
+// by figure group, for custom exercises and anything unmapped
+const GILL={curl:'0224',pushdown:'0206',ohext:'0193',skull:'0170',pressflat:'0042',pressinc:'0043',fly:'0048',raise:'0018',ohpress:'0004',row:'0025',pulldown:'0093',
+ pullup:'0087',dip:'0054',squat:'0122',lunge:'0132',hinge:'0118',legext:'0142',legcurl:'0119',calf:'0282',crunch:'0288',situp:'0291',facepull:'0035',
+ pushup:'0077',plank:'p:plank',hangraise:'p:hkr',hollow:'p:hollow'};
+const BWILL={pushup:'0077',pullup:'0087',dip:'0054',hangraise:'p:hkr',plank:'p:plank',squat:'p:squat',situp:'0291',lunge:'p:lunge',crunch:'0291',hollow:'p:hollow'};
+const STILL={'Diamond push-ups':'0188','Chin-ups, slow down':'0090','Chin-up hold at the top':'0090','Bench dips':'0162','Hanging knee raises':'p:hkr','Pike push-ups':'p:pike','Burpees':'p:burpee','Hollow hold':'p:hollow'};
+// Skills use the drawn pictograms in poses.js (POSEPH left empty; f:/c: photo keys still supported).
+const POSEPH={};
+const PHCRED=[["fl_straddle.jpg","Fenix1000","CC BY-SA 4.0","https://commons.wikimedia.org/wiki/File:Front_lever_-_Serhii_Solodkyi_18280.jpg"],["fl_full.jpg","Fenix1000","CC BY-SA 4.0","https://commons.wikimedia.org/wiki/File:Front_lever_-_Serhii_Solodkyi_73379.jpg"],["fl_rings.jpg","Simon Höger","CC BY 4.0","https://commons.wikimedia.org/wiki/File:Donauinsel_Hangwaage.jpg"],["bl_full.png","Muscleups","CC BY-SA 4.0","https://commons.wikimedia.org/wiki/File:Back_lever_being_performed_outdoors.png"],["bl_rings.jpg","Ondra7575","CC BY-SA 4.0","https://commons.wikimedia.org/wiki/File:Back_lever_on_gymnastics_rings.jpg"],["inverted_hang.jpg","Martin Rulsch, Wikimedia Commons","CC BY-SA 4.0","https://commons.wikimedia.org/wiki/File:2019-06-29_1st_FIG_Artistic_Gymnastics_JWCH_Men%27s_Apparatus_finals_Still_rings_(Martin_Rulsch)_292.jpg"],["pl_tuck.jpg","Mrplr","CC BY-SA 4.0","https://commons.wikimedia.org/wiki/File:Full_planche.jpg"],["pl_full.jpg","Jonathanfv","CC BY 3.0","https://commons.wikimedia.org/wiki/File:Planche.jpg"],["pl_straddle.jpg","CmdCourgette","CC BY-SA 4.0","https://commons.wikimedia.org/wiki/File:Straddle_planche_2_doigts.jpg"],["crow.jpg","Trev M","CC BY 3.0","https://commons.wikimedia.org/wiki/File:Bakasana.jpg"],["vflag.jpg","Extrem7","CC BY-SA 3.0","https://commons.wikimedia.org/wiki/File:%D0%92%D0%B5%D1%80%D1%82%D0%B8%D0%BA%D0%B0%D0%BB%D1%8C%D0%BD%D0%B8%D0%B9.jpg"],["flag_full.jpg","Sven Kohl","CC BY-SA 3.0","https://commons.wikimedia.org/wiki/File:Flag3.jpg"],["flag_tuck.jpg","Extrem7","CC BY-SA 3.0","https://commons.wikimedia.org/wiki/File:Paralel_flag.jpg"],["flag_straddle.jpg","Extrem7","CC BY-SA 3.0","https://commons.wikimedia.org/wiki/File:%D0%94%D1%80%D0%B0%D0%BA%D0%BE%D0%BD.jpg"],["lsit_full.jpg","Tommy Gilligan/West Point Public Affairs","Public domain","https://commons.wikimedia.org/wiki/File:West_Point_male_gymnast_L-sit.jpg"],["lsit_bars.jpg","BandiSW","CC BY-SA 4.0","https://commons.wikimedia.org/wiki/File:Figura_L-Sit_na_paraletkach.jpg"],["vsit.jpg","Martin Rulsch, Wikimedia Commons","CC BY-SA 4.0","https://commons.wikimedia.org/wiki/File:Deutsche_Jugendmeisterschaften_Ger%C3%A4tturnen_m%C3%A4nnlich_Training_at_Internationales_Deutsches_Turnfest_Berlin_2017_(Martin_Rulsch)_0464.jpg"],["sideplank.jpg","Tyler  Read","CC BY 2.0","https://commons.wikimedia.org/wiki/File:Girl_exercising_side_plank.jpg"],["hs_free.jpg","ChroniquesExtreme","CC BY-SA 4.0","https://commons.wikimedia.org/wiki/File:Raimundo_Querido_r%C3%A9alisant_un_%C3%A9quilibre_%C3%A0_Tol%C3%A8de,_Espagne,_octobre_2007.jpg"],["hs_free2.jpg","Digital Rye","CC0","https://commons.wikimedia.org/wiki/File:Guy_doing_handstand.jpg"],["hspu_wall.jpg","U.S. Air Force photo by Senior Airman Stephanie Rubi","Public domain","https://commons.wikimedia.org/wiki/File:Handstand_pushup.jpg"],["pike_hs.jpg","Lance Cpl. Cory D. Polom","Public domain","https://commons.wikimedia.org/wiki/File:Navy_handstand_pushup.jpg"],["pull_top.jpg","PTPioneer","CC BY 2.0","https://commons.wikimedia.org/wiki/File:Girl_doing_pull_up_top_position.jpg"],["ctb.jpg","Brad Greenlee (photos · photo sets)","CC BY 2.0","https://commons.wikimedia.org/wiki/File:2008_CrossFit_Games_-_Brandon_doing_chest-to-bar_pull-ups.jpg"],["deadhang.jpg","U.S. Army JMRC by Spc. Julian Padua","Public domain","https://commons.wikimedia.org/wiki/File:Leg_Tuck_(5847909).jpg"],["burpee.jpg","Taco fleur","CC BY-SA 4.0","https://commons.wikimedia.org/wiki/File:Burpee_4_Hips_High.jpg"]];
+const illMedia=(k,cls='')=>{if(k&&k.startsWith('p:')&&POSEPH[k.slice(2)])k=POSEPH[k.slice(2)];
+ if(k&&k.startsWith('f:'))return `<div class="ph photo ${cls}"><img src="img/${k.slice(2)}_0.jpg" alt="" loading="lazy" decoding="async"><img class="b" src="img/${k.slice(2)}_1.jpg" alt="" loading="lazy" decoding="async"></div>`;
+ if(k&&k.startsWith('c:'))return `<div class="ph photo ${cls}"><img src="ph/${k.slice(2)}" alt="" loading="lazy" decoding="async"></div>`;
+ return illMediaD(k,cls)};
+const illMediaD=(k,cls='')=>!k?'':k.startsWith('p:')?`<div class="ph ill ${cls}"><img class="loop" src="gif/${k.slice(2)}.webp" alt="" loading="lazy" decoding="async"></div>`
+ :`<div class="ph ill ${cls}"><img src="ill/${k}_0.svg" alt="" loading="lazy" decoding="async"><img class="b" src="ill/${k}_1.svg" alt="" loading="lazy" decoding="async"></div>`;
+const exMedia=(id,cls)=>illMedia(ILL[id]||GILL[def(id).g]||'0224',cls);
+const gMedia=(g,name,cls)=>illMedia((name!=null&&STILL[name])||BWILL[g]||GILL[g]||'0077',cls);
+
+/* ===================== Skill tree ===================== */
+// Standards and order follow Overcoming Gravity (Low) and the r/bodyweightfitness progressions.
+// Tier = rough difficulty, 1 (first months) to 7 (elite, years). XP = tier × 10.
+// t: reps | hold (seconds) | wt (reps at +kg). each: per side, log your weaker side.
+// mx: also counts daily-rep sets and max tests of that move. lib: also counts sets from the gym log.
+// req: skills from other branches that must be done first. ill: drawing (4 digits = Everkinetic, p: = drawn pose).
+const BR=[
+ {id:'pull',n:'Pull',goal:'One-arm chin-up',nodes:[
+  ['pull1','Dead hang','hold',30,1,{ill:'p:hang',how:'Hang from the bar with straight arms. Shoulders gently pulled down, not shrugged into your ears.',train:'3 hangs as long as you can, 3 times a week. Easy to tag onto any gym session.'}],
+  ['pull0','Australian rows','reps',15,1,{ill:'0086',how:'Bar at hip height, body straight under it, heels on the floor. Pull your chest to the bar.',train:'3 × 8–15. Walk your feet forward to make it harder.'}],
+  ['pull2','5 pull-ups','reps',5,1,{ill:'0087',lib:['pullup','chinup'],mx:'pull',how:'Dead hang to chin over the bar. No kicking, straight arms at the bottom of every rep.',train:'Negatives: jump up, lower in 5 s, 4 × 3. Plus daily-rep sets of 1–2.'}],
+  ['pull3','10 pull-ups','reps',10,2,{ill:'0087',lib:['pullup'],mx:'pull',how:'Same strict standard: chin clears the bar, arms straight at the bottom.',train:'Daily-rep sets at half your max, plus Thursday: 5 sets of (max − 3). About +1 rep every 2 weeks is normal.'}],
+  ['pull9','15 pull-ups','reps',15,3,{ill:'0087',lib:['pullup'],mx:'pull',how:'Fifteen strict reps in one set.',train:'Keep the daily sets. Once a week: one max set, then 3 sets of half that.'}],
+  ['pull4','Weighted pull-up','wt',5,3,{kg:10,ill:'0087',lib:['pullup','chinup'],how:'Dip belt, or a dumbbell held between your feet. Same strict reps.',train:'Do your gym pull-ups weighted: 3 × 5. Add 2.5 kg when all three sets hit 5.'}],
+  ['pull5','Heavy weighted pull-up','wt',3,4,{kg:20,ill:'0087',lib:['pullup','chinup'],how:'Strict reps with +20 kg.',train:'Heavy triples: 4 × 3 with 3 min rest. Keep the unweighted daily sets.'}],
+  ['pull6','Archer pull-ups','reps',3,4,{each:true,ill:'p:archer',how:'Wide grip. Pull toward one hand while the other arm stays almost straight along the bar.',train:'4 × 2 each side, twice a week. Straighten the helper arm a little more each week.'}],
+  ['pull7','One-arm negative','hold',5,5,{each:true,ill:'p:oac',how:'Get to the top with both arms, let go with one, and lower as slowly as you can. Log the seconds.',train:'3 × 2 each side with full rest, plus heavy weighted pull-ups.'}],
+  ['pull8','One-arm chin-up','reps',1,6,{each:true,ill:'p:oac',how:'A rare skill. Most people need weighted chin-ups with about +50% of bodyweight for a few reps first.',train:'One-arm negatives 3 × 2, towel-assisted one-arm chin-ups 4 × 2 each side, heavy weighted chin-ups 3 × 3.'}]]},
+ {id:'mu',n:'Muscle-up',goal:'Strict muscle-up',nodes:[
+  ['mu1','Chest-to-bar pull-ups','reps',5,2,{req:['pull3'],ill:'p:pulltop',how:'Pull until your chest touches the bar. Lean back slightly at the top.',train:'After normal pull-ups: 4 × 3, pulling as high as you can.'}],
+  ['mu2','High pull-ups','reps',5,3,{ill:'p:highpull',how:'Explosive. The bar reaches your lower chest or belly button.',train:'5 × 3 with full rest. Think "throw the bar down to your hips".'}],
+  ['mu3','First muscle-up','reps',1,4,{req:['dip2'],ill:'p:mu',how:'Explosive high pull, lean your chest over the bar, then press out like a dip. A small kip is fine for now.',train:'Band-assisted muscle-ups 4 × 3 and straight-bar dips 3 × 8.'}],
+  ['mu4','Muscle-ups','reps',5,4,{ill:'p:mu',how:'Five clean reps in one set.',train:'EMOM: 1–2 muscle-ups at the start of every minute for 8 minutes.'}],
+  ['mu5','Strict muscle-up','reps',1,5,{ill:'p:mu',how:'No leg swing at all. Pure strength from a dead hang.',train:'False-grip high pulls 4 × 3 and slow muscle-up negatives 3 × 2.'}],
+  ['mu6','Strict muscle-ups','reps',5,6,{ill:'p:mu',how:'Five strict reps, no swing.',train:'Strict singles EMOM for 10 minutes, then weighted pull-ups.'}]]},
+ {id:'push',n:'Push',goal:'One-arm push-up',nodes:[
+  ['push1','Push-ups','reps',20,1,{ill:'0077',mx:'push',how:'Body in one straight line, chest touches the floor, full lockout.',train:'Daily-rep sets at half your max.'}],
+  ['push2','Diamond push-ups','reps',15,2,{ill:'0188',how:'Hands together under your chest, elbows close to your sides.',train:'3 × (max − 2), twice a week. Great for triceps too.'}],
+  ['push3','Decline push-ups','reps',15,2,{ill:'0075',how:'Feet on a bench, hands on the floor, body straight.',train:'3 × 10–15, twice a week.'}],
+  ['push4','Archer push-ups','reps',5,3,{each:true,ill:'0072',how:'Very wide hands. Lower toward one hand while the other arm stays almost straight.',train:'4 × 3 each side, twice a week.'}],
+  ['push5','One-arm push-up, hands on a bench','reps',5,3,{each:true,ill:'p:pushup1',how:'Hand on a bench or bar at hip height, feet wide, hips square.',train:'4 × 5 each side. Use a lower surface when all sets are clean.'}],
+  ['push6','One-arm push-up','reps',1,4,{each:true,ill:'p:pushup1',how:'Feet wide, hips square, chest down to a fist above the floor and back up.',train:'Slow negatives 3 × 3 each side plus the bench version.'}],
+  ['push7','One-arm push-ups','reps',5,5,{each:true,ill:'p:pushup1',how:'Five clean reps each side.',train:'4 × 2–3 each side. Add one rep a week.'}]]},
+ {id:'dip',n:'Dips',goal:'Heavy dips & bar dips',nodes:[
+  ['dip1','Dips','reps',10,1,{ill:'0054',mx:'dip',lib:['dips'],how:'Shoulders below the elbows at the bottom, full lockout at the top.',train:'Daily-rep sets at half your max.'}],
+  ['dip2','Dips','reps',15,2,{ill:'0054',mx:'dip',lib:['dips'],how:'Same depth on every rep.',train:'Daily sets, plus Thursday: 4 × (max − 3).'}],
+  ['dip3','Dips','reps',20,2,{ill:'0054',mx:'dip',lib:['dips'],how:'Twenty in one set, full depth.',train:'Daily sets, plus one max set at the end of Thursday.'}],
+  ['dip5','Straight-bar dips','reps',10,3,{ill:'p:sbdip',how:'On top of a single bar, lean forward and lower until the bar touches your chest.',train:'3 × 6–8. This is the top half of a muscle-up.'}],
+  ['dip4','Weighted dip','wt',5,3,{kg:20,ill:'0054',lib:['dips'],how:'Belt or a dumbbell between your knees.',train:'In the gym: 3 × 5. Add 2.5 kg when every set hits 5.'}],
+  ['dip6','Heavy weighted dip','wt',3,4,{kg:35,ill:'0054',lib:['dips'],how:'Strict, full-depth triples with +35 kg (about half your bodyweight).',train:'4 × 3 with 3 min rest, once a week. Keep the bodyweight daily sets.'}]]},
+ {id:'core',n:'Core',goal:'Dragon flag',nodes:[
+  ['core1','Plank','hold',60,1,{ill:'p:plank',mx:'plank',how:'Ribs down, glutes tight, one straight line from head to heels.',train:'3 holds at about 80% of your best.'}],
+  ['core2','Hollow hold','hold',30,1,{ill:'p:hollow',how:'Lower back glued to the floor, arms and legs just off it.',train:'4 × 20 s. Lower your arms and legs as it gets easier.'}],
+  ['core3','Hanging knee raises','reps',15,1,{ill:'p:hkr',lib:['hlr'],mx:'hlr',how:'No swinging. Curl your pelvis up, knees to chest.',train:'3 × 10–15 after training.'}],
+  ['core4','Hanging leg raises','reps',10,2,{ill:'p:hlr',lib:['hlr'],how:'Straight legs to at least hip height, no swing.',train:'3 × 6–10 after training. It\'s already on Leg demolition day.'}],
+  ['core6','Toes-to-bar','reps',10,3,{ill:'p:ttb',how:'From a hang, lift straight legs until your toes touch the bar.',train:'4 × 5, controlled, no kipping.'}],
+  ['core8','Dragon flag negatives','reps',5,3,{ill:'p:dflag',how:'Lie on a bench and hold it behind your head. Body straight up, then lower in 5 s without bending at the hips.',train:'3 × 3 slow negatives, twice a week.'}],
+  ['core9','Dragon flags','reps',5,4,{ill:'p:dflag',how:'Lower and raise with a straight body, hips never bending.',train:'4 × 3, twice a week. Add a pause halfway down.'}]]},
+ {id:'ls',n:'L-sit',goal:'V-sit',nodes:[
+  ['core5','Tuck L-sit','hold',20,2,{req:['dip1'],ill:'p:tucklsit',how:'On dip bars, parallettes or the floor: arms locked, knees tucked to your chest, hips off the ground.',train:'5 × 10 s holds, 3 times a week.'}],
+  ['ls2','One-leg L-sit','hold',15,3,{each:true,ill:'p:lsit',how:'One leg straight out, the other tucked. Switch each set.',train:'6 × 8 s, alternating legs.'}],
+  ['core7','Full L-sit','hold',15,3,{ill:'p:lsit',how:'Legs straight and level with the floor, arms locked.',train:'One-leg L-sits plus 6 × 8 s full holds.'}],
+  ['ls4','Full L-sit','hold',30,4,{ill:'p:lsit',how:'Thirty seconds, legs level the whole time.',train:'5 × 15 s holds. Seated pike leg lifts 3 × 10 for compression.'}],
+  ['ls5','V-sit','hold',10,5,{ill:'p:vsit',how:'From an L-sit, push the floor away and lift your legs well above level, toward your face.',train:'Pike stretching daily, seated pike lifts 4 × 10, and 6 × 5 s V-sit attempts.'}]]},
+ {id:'fl',n:'Front lever',goal:'Full front lever',nodes:[
+  ['fl1','Tuck front lever','hold',15,3,{req:['pull3','core4'],ill:'p:fltuck',how:'Hang, pull straight arms down, knees tucked to chest, back flat and level with the floor.',train:'6 × 8–10 s holds, 2–3 times a week.'}],
+  ['fl2','Advanced tuck front lever','hold',10,4,{ill:'p:fladv',how:'Back flat and level, hips open so your thighs are at 90° to your body.',train:'6 × 6–8 s holds, plus tuck front-lever rows 3 × 6.'}],
+  ['fl3','One-leg front lever','hold',8,4,{ill:'p:flone',how:'One leg straight, one tucked, body level.',train:'6 × 5 s, switching legs each set.'}],
+  ['fl4','Straddle front lever','hold',6,5,{ill:'p:flstr',how:'Both legs straight and spread wide, body level.',train:'6 × 4–5 s holds.'}],
+  ['fl5','Full front lever','hold',5,6,{ill:'p:flfull',how:'Body straight and horizontal under the bar, arms locked.',train:'Straddle holds plus slow full-lever negatives 4 × 3.'}]]},
+ {id:'bl',n:'Back lever',goal:'Full back lever',nodes:[
+  ['bl1','Skin the cat','reps',5,2,{req:['pull2'],ill:'p:sktc',how:'From a hang, tuck and rotate backward through your arms until your feet point at the floor, then come back.',train:'3 × 3, slow. Opens up the shoulders for every lever.'}],
+  ['bl2','German hang','hold',30,2,{ill:'p:german',how:'The bottom of a skin the cat: arms behind you, body hanging below the bar.',train:'3 × 15–30 s. Go gently, it\'s a big shoulder stretch.'}],
+  ['bl3','Tuck back lever','hold',15,3,{ill:'p:bltuck',how:'Face down, back level, knees tucked to your chest, arms straight behind you.',train:'6 × 10 s holds.'}],
+  ['bl4','Advanced tuck back lever','hold',10,3,{ill:'p:bladv',how:'Back flat, thighs at 90° to your body.',train:'6 × 8 s holds.'}],
+  ['bl5','Straddle back lever','hold',8,4,{ill:'p:blstr',how:'Legs straight and spread, body level, face down.',train:'6 × 5 s holds.'}],
+  ['bl6','Full back lever','hold',5,5,{ill:'p:blfull',how:'Legs together, one straight line, level with the floor.',train:'Straddle holds and slow full back-lever negatives 4 × 3.'}]]},
+ {id:'pl',n:'Planche',goal:'Full planche',nodes:[
+  ['pl1','Frog stand','hold',30,1,{ill:'p:frog',how:'Hands on the floor, knees resting on the backs of your elbows, feet off the ground.',train:'5 × 15–20 s, any session.'}],
+  ['pl2','Planche lean','hold',30,2,{req:['push1'],ill:'p:pllean',how:'Push-up position, arms locked, then lean your shoulders well past your hands.',train:'5 × 20 s. Lean a bit further every week.'}],
+  ['pl3','Pseudo planche push-ups','reps',10,3,{ill:'p:pllean',how:'Push-ups with hands by your waist and shoulders leaning past them.',train:'4 × 6–10, twice a week.'}],
+  ['pl4','Tuck planche','hold',10,4,{req:['dip3'],ill:'p:pltuck',how:'Arms locked, knees tucked to your chest, hips as high as your shoulders, feet off the floor.',train:'8 × 6–8 s holds, 3 times a week. Planche leans as warm-up.'}],
+  ['pl5','Advanced tuck planche','hold',8,5,{ill:'p:pladv',how:'Back flat and level, thighs at 90° to your body.',train:'8 × 5 s holds. Expect months here.'}],
+  ['pl6','Straddle planche','hold',5,6,{ill:'p:plstr',how:'Legs straight and spread wide, body level, arms locked.',train:'Straddle holds with a band, 6 × 5 s.'}],
+  ['pl7','Full planche','hold',3,7,{ill:'p:plfull',how:'Legs together, body level and straight, held only on your hands. Years of work for most people.',train:'Straddle holds, full-planche negatives from a handstand, band-assisted full holds.'}]]},
+ {id:'hf',n:'Human flag',goal:'Full human flag',nodes:[
+  ['hf1','Side plank','hold',45,1,{ill:'p:sideplank',how:'On one hand or forearm, body in a straight line facing sideways.',train:'3 × 30–45 s each side.'}],
+  ['hf2','Vertical flag','hold',10,3,{req:['pull3','hs3'],ill:'p:vflag',how:'Top hand pulls, bottom hand pushes, body straight up along the pole.',train:'5 × 5–10 s, both sides.'}],
+  ['hf3','Tuck flag','hold',5,4,{ill:'p:tflag',how:'Body sideways and level, knees tucked.',train:'6 × 5 s each side.'}],
+  ['hf4','Straddle flag','hold',5,4,{ill:'p:sflag',how:'Legs straight and spread, body level.',train:'6 × 3–5 s each side.'}],
+  ['hf5','Full human flag','hold',5,5,{ill:'p:flag',how:'Legs together, body straight and level with the floor.',train:'Straddle holds plus slow lowering from vertical, 5 × 3.'}]]},
+ {id:'hs',n:'Handstand',goal:'60 s freestanding',nodes:[
+  ['hs2','Wall walks','reps',3,1,{ill:'p:wallwalk',how:'Start in a push-up with your feet at the wall. Walk the feet up and the hands in until your chest touches the wall.',train:'3 × 2, slow and controlled.'}],
+  ['hs3','Chest-to-wall handstand','hold',60,2,{ill:'p:hswall',how:'Belly to the wall, body straight, push tall through the shoulders.',train:'4 holds at about 70% of your best, 3 times a week.'}],
+  ['hs5','Freestanding handstand','hold',5,3,{ill:'p:hsfree',how:'Kick up away from the wall and balance with your fingers.',train:'10 minutes of kick-ups every session. Many short tries beat a few long ones.'}],
+  ['hs6','Freestanding handstand','hold',30,4,{ill:'p:hsfree',how:'Thirty seconds, no wall.',train:'Daily: 10 attempts, each as long as you can.'}],
+  ['hs8','Freestanding handstand','hold',60,5,{ill:'p:hsfree',how:'A full minute, no wall.',train:'Daily practice, 10–15 min. Mix long holds with shape drills.'}]]},
+ {id:'hp',n:'HSPU',goal:'Freestanding HSPU',nodes:[
+  ['hs1','Pike push-ups','reps',10,1,{ill:'p:pike',how:'Hips high, lower your head to the floor just in front of your hands.',train:'3 × 8–10, twice a week.'}],
+  ['hp2','Elevated pike push-ups','reps',10,2,{ill:'p:pike',how:'Feet on a box or bench so your hips are above your shoulders.',train:'3 × 6–10, twice a week. Use a higher box over time.'}],
+  ['hs4','Wall handstand push-ups','reps',5,3,{req:['push2','hs3'],ill:'p:hspu',how:'Back to the wall, lower until your head lightly touches a cushion, press back up.',train:'Elevated pike push-ups plus HSPU negatives 3 × 3.'}],
+  ['hp4','Deficit wall HSPU','reps',5,4,{ill:'p:hspudef',how:'Hands on parallettes or plates so your head goes below hand level.',train:'4 × 3–5, twice a week.'}],
+  ['hs7','Freestanding HSPU','reps',1,6,{req:['hs6'],ill:'p:hspufree',how:'No wall. Lower with control and press back up into balance.',train:'Partial-range freestanding HSPU and deficit wall HSPU 4 × 5.'}]]},
+ {id:'leg',n:'Pistol',goal:'Pistol squats (optional, you hate legs)',nodes:[
+  ['leg1','Bodyweight squats','reps',40,1,{ill:'p:squat',how:'Full depth, heels down.',train:'You already do these in Cindy.'}],
+  ['leg2','Bulgarian split squat','reps',15,1,{each:true,ill:'0132',how:'Bodyweight only. Back foot on a bench, deep bend in the front knee.',train:'3 × 10–15 each side.'}],
+  ['leg3','Assisted pistol','reps',8,2,{each:true,ill:'p:pistol',how:'Hold a post or doorframe lightly. One leg straight out in front, sit all the way down.',train:'3 × 5–8 each side, using less help over time.'}],
+  ['leg4','Box pistol','reps',5,2,{each:true,ill:'p:pistol',how:'Sit onto a low box on one leg and stand back up without help.',train:'Use a lower box over time.'}],
+  ['leg5','Pistol squat','reps',1,3,{each:true,ill:'p:pistol',how:'Full depth on one leg, other leg straight out. A light weight held in front helps balance.',train:'Box pistols plus pistol negatives 3 × 3 each side.'}],
+  ['leg6','Pistol squats','reps',5,4,{each:true,ill:'p:pistol',how:'Five clean reps each side.',train:'3 × 3–5 each side.'}]]}
+];
+const TIERS=['','beginner','novice','intermediate','advanced','expert','elite','world-class'];
+const SKN=[],SKI={};
+BR.forEach(b=>b.nodes.forEach(([id,n,t,v,tier,x],i)=>{const o={id,n,t,v,tier,br:b.id,i,...x};SKN.push(o);SKI[id]=o}));
+// rank thresholds scale with the size of the tree, so adding branches never breaks them
+const XPMAX=SKN.reduce((a,o)=>a+o.tier*10,0);
+const RANKS=[[0,'Rookie'],[.04,'Mover'],[.12,'Athlete'],[.25,'Beast'],[.42,'Freak'],[.62,'Legend'],[.85,'Mythic']].map(([f,n])=>[Math.round(f*XPMAX/10)*10,n]);
+const stdTxt=o=>o.t==='wt'?`+${o.kg} kg × ${o.v}`:o.t==='hold'?`${o.v} s hold${o.each?' each side':''}`:`${o.v} rep${o.v>1?'s':''}${o.each?' each side':''}`;
+const discTxt=o=>o.t==='wt'?`+${o.kg}<small>kg × ${o.v}</small>`:o.t==='hold'?`${o.v}<small>sec</small>`:`${o.v}<small>${o.each?'each':'reps'}</small>`;
+const brOf=o=>BR.find(b=>b.id===o.br);
+function skBest(o){
+  let v=0,d=null,src='';const up=(x,dd,s)=>{x=+x||0;if(x>v){v=x;d=dd;src=s}};
+  (S.sk.att[o.id]||[]).forEach(a=>{if(o.t!=='wt'||(a.kg||0)>=o.kg)up(a.v,a.d,'logged')});
+  if(o.mx&&o.t!=='wt'){(S.gtg.max[o.mx]||[]).forEach(m=>up(m.v,m.d,'max test'));Object.entries(S.gtg.days).forEach(([dd,g])=>(g[o.mx]||[]).forEach(x=>up(x,dd,'daily reps')))}
+  if(o.lib)S.log.forEach(l=>o.lib.forEach(id=>(l.ex[id]||[]).forEach(([kg,r])=>{if(o.t!=='wt'||kg>=o.kg)up(r,l.d,'gym log')})));
+  return {v,d,src};
+}
+let ST={};
+function skState(){
+  const own={};SKN.forEach(o=>own[o.id]=skBest(o).v>=o.v||!!S.sk.manual[o.id]);
+  const done={};BR.forEach(b=>{let later=false;for(let i=b.nodes.length-1;i>=0;i--){const id=b.nodes[i][0];if(own[id])later=true;done[id]=later}});
+  const st={};SKN.forEach(o=>{if(done[o.id]){st[o.id]='done';return}
+    const prev=o.i?SKI[brOf(o).nodes[o.i-1][0]]:null;st[o.id]=(!prev||done[prev.id])&&(o.req||[]).every(r=>done[r])?'open':'locked'});
+  return st;
+}
+const xp=()=>SKN.reduce((a,o)=>a+(ST[o.id]==='done'?o.tier*10:0),0);
+function rank(){const x=xp();let i=0;RANKS.forEach((r,j)=>{if(x>=r[0])i=j});const nx=RANKS[i+1];return {x,name:RANKS[i][1],i,next:nx,pct:nx?(x-RANKS[i][0])/(nx[0]-RANKS[i][0]):1}}
+function skSync(celebrate){
+  if(!S.sk)S.sk={att:{},done:{},manual:{},focus:null,br:'pull'};
+  ST=skState();const fresh=SKN.filter(o=>ST[o.id]==='done'&&!S.sk.done[o.id]);
+  fresh.forEach(o=>S.sk.done[o.id]=TODAY);
+  const f=S.sk.focus&&SKI[S.sk.focus];
+  if(f&&ST[f.id]==='done'){const nx=brOf(f).nodes.slice(f.i+1).map(n=>SKI[n[0]]).find(n=>ST[n.id]!=='done');S.sk.focus=nx?nx.id:null}
+  if(celebrate&&fresh.length){const shown=fresh.filter(o=>!fresh.some(p=>p.br===o.br&&p.i>o.i));UI.cele=(UI.cele||[]).concat(shown.map(o=>o.id));setTimeout(()=>{beep(880,120);setTimeout(()=>beep(1320,260),140)},50);buzz([60,40,120])}
+}
+function celeHTML(){
+  const o=SKI[UI.cele[0]],b=brOf(o),nx=b.nodes[o.i+1]?SKI[b.nodes[o.i+1][0]]:null,rk=rank();
+  return `<div class="over work"><div class="inner" style="justify-content:center;text-align:center">
+   <div class="burst"><div class="core">${I.check}</div>${Array.from({length:18},(_,i)=>`<i style="--a:${i*20}deg;--d:${(i%3)*.07}s"></i>`).join('')}</div>
+   <p class="label">${b.n} · skill unlocked</p><h1 style="font-size:52px;line-height:.9">${o.n}</h1><p class="num" style="font-size:22px">${stdTxt(o)}</p>
+   <div class="num" style="font-size:46px">+${o.tier*10} XP</div>
+   <p class="small" style="font-weight:700">Rank: ${rk.name}${rk.next?` · ${rk.next[0]-rk.x} XP to ${rk.next[1]}`:''}</p>
+   ${nx?`<p class="small">Next up: <b>${nx.n}, ${stdTxt(nx)}</b></p>`:`<p class="small"><b>${b.n} branch complete.</b></p>`}
+   <button class="btn big block" data-a="celeok">Let's go</button></div></div>`;
+}
+const LOCK='<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>';
+
+// Whole tree: every branch in one connected graph. Rows = how deep a skill sits (longest chain of
+// prerequisites from the start), columns = branches ordered so linked branches sit side by side.
+const MAPCOLS=['leg','core','fl','bl','pull','mu','dip','ls','pl','push','hp','hs','hf'];
+let MAPL=null;
+const skPar=o=>[...(o.i?[brOf(o).nodes[o.i-1][0]]:[]),...(o.req||[])];
+function mapLayout(){if(MAPL)return MAPL;
+  const cols=MAPCOLS.filter(id=>BR.some(b=>b.id===id)).concat(BR.map(b=>b.id).filter(id=>!MAPCOLS.includes(id)));
+  const dep={},D=o=>dep[o.id]??(dep[o.id]=Math.max(0,...skPar(o).map(id=>D(SKI[id])+1)));
+  SKN.forEach(D);
+  const CW=92,RH=112,TOP=110,W=cols.length*CW+20,rows=Math.max(...Object.values(dep))+1;
+  const cx=i=>10+CW/2+i*CW,pos={};SKN.forEach(o=>pos[o.id]=[cx(cols.indexOf(o.br)),TOP+dep[o.id]*RH]);
+  const edges=[];SKN.forEach(o=>skPar(o).forEach(id=>edges.push([id,o.id,SKI[id].br!==o.br])));
+  const roots=SKN.filter(o=>!skPar(o).length).map(o=>o.id);
+  return MAPL={cols,cx,pos,edges,roots,W,H:TOP+rows*RH,root:[W/2,30]}}
+function vSkillMap(fs){
+  const L=mapLayout(),TRUNK=58;
+  const curve=(x1,sy,x2,ey)=>{const m=(ey-sy)/2;return `M${x1} ${sy}C${x1} ${sy+m} ${x2} ${ey-m} ${x2} ${ey}`};
+  const col=(on,both,x)=>x?'var(--violet)':both?'var(--accent)':on?'color-mix(in srgb,var(--accent) 45%,var(--line))':'var(--line)';
+  const line=(d,c,x,dim)=>`<path d="${d}" fill="none" stroke="${c}" stroke-width="${x?2.5:3.5}"${x?' stroke-dasharray="6 5"':''} stroke-linecap="round"${dim?' opacity=".5"':''}/>`;
+  // trunk: Start -> one bar -> each root
+  const rx=L.roots.map(id=>L.pos[id][0]);
+  let trunk=line(`M${L.root[0]} ${L.root[1]+14}V${TRUNK}`,'var(--ink)')+line(`M${Math.min(...rx)} ${TRUNK}H${Math.max(...rx)}`,'var(--ink)');
+  L.roots.forEach(id=>{const [x,y]=L.pos[id];trunk+=line(`M${x} ${TRUNK}V${y-4}`,ST[id]==='done'?'var(--accent)':'var(--ink)')});
+  const same=[],cross=[];
+  L.edges.forEach(([a,b,x])=>{const [x1,y1]=L.pos[a],[x2,y2]=L.pos[b],on=ST[a]==='done',both=on&&ST[b]==='done';
+    (x?cross:same).push(line(curve(x1,y1+62,x2,y2-4),col(on,both,x),x,x&&!on))});
+  const front=new Set(BR.map(b=>b.nodes.map(n=>SKI[n[0]]).find(o=>ST[o.id]==='open')).filter(Boolean).map(o=>o.id));
+  const legend='<div class="mlegend"><span><i class="d"></i>done</span><span><i></i>next in branch</span><span><i class="x"></i>opens another branch</span></div>';
+  const inner=`<svg width="${L.W}" height="${L.H}" aria-hidden="true">${trunk}${same.join('')}${cross.join('')}</svg>
+    <div class="mroot" style="left:${L.root[0]}px;top:${L.root[1]}px">Start</div>
+    ${L.cols.map((id,i)=>`<button class="mcol" style="left:${L.cx(i)}px;top:${TRUNK+8}px" data-a="skbr" data-b="${id}" data-view="branch">${BR.find(b=>b.id===id).n}</button>`).join('')}
+    ${SKN.map(o=>{const s=ST[o.id],[x,y]=L.pos[o.id],p=s==='done'?1:Math.min(1,skBest(o).v/o.v);
+      return `<button class="mnode ${s}${front.has(o.id)?' front':''}" style="left:${x}px;top:${y}px" data-a="sknode" data-id="${o.id}" aria-label="${esc(o.n)}, ${stdTxt(o)}, ${s==='done'?'mastered':s}">
+       <span class="disc" style="--p:${s==='locked'?0:p}"><span>${s==='done'?I.check:s==='locked'?LOCK:o.tier+'<small>lv</small>'}</span></span><span class="ml">${esc(o.n)}<small>${stdTxt(o).replace(' each side',' each')}</small></span></button>`}).join('')}`;
+  if(fs)return `<div class="mapfs" role="dialog" aria-label="Whole skill tree">
+    <div class="mapfs-bar"><b>Skill tree</b><button data-a="mapfz" data-d="-1" aria-label="Zoom out">−</button><button data-a="mapfz" data-d="1" aria-label="Zoom in">+</button><button class="t" data-a="mapfit">Fit</button><button data-a="mapfs" data-v="0" aria-label="Close">${I.x}</button></div>
+    <div class="mapfs-view" id="mapview"><div class="skmap" id="mapstage" style="width:${L.W}px;height:${L.H}px">${inner}</div></div>
+    <div class="mapfs-foot">${legend}<span>Drag to move · pinch to zoom · tap a skill or branch name</span></div></div>`;
+  return `${legend}
+   <div class="skprev" role="button" tabindex="0" data-a="mapfs" data-v="1" aria-label="Open the whole skill tree full screen"><div class="skmap" id="skprev" style="width:${L.W}px;height:${L.H}px">${inner}</div><span class="skprev-cta">Open full screen ⤢</span></div>
+   <p class="small muted">Tap to open it full screen, then drag and pinch to look around. Dashed purple lines show where one branch opens another.</p>`;
+}
+// Inline preview: scale the whole tree to the card width.
+function mapCenter(){const p=document.getElementById('skprev');if(p){const L=mapLayout(),z=p.parentElement.clientWidth/L.W;p.style.setProperty('--z',z);p.parentElement.style.height=Math.round(L.H*z)+'px'}mapFS()}
+// Full screen: drag to pan, pinch or wheel to zoom. A drag never counts as a tap on a skill.
+function mapFS(){const v=document.getElementById('mapview'),st=document.getElementById('mapstage');if(!v||!st)return;const L=mapLayout(),W=v.clientWidth,H=v.clientHeight;
+  const minS=Math.min(W/L.W,H/L.H)*.95;
+  if(!UI.mv){const s=.9,f=S.sk.focus&&L.pos[S.sk.focus];UI.mv=f?{s,x:W/2-f[0]*s,y:H/2-f[1]*s}:{s,x:W/2-L.root[0]*s,y:10}}
+  const ap=()=>{const m=UI.mv;m.s=Math.max(minS,Math.min(1.8,m.s));
+    m.x=Math.min(W*.5,Math.max(W*.5-L.W*m.s,m.x));m.y=Math.min(H*.5,Math.max(H*.5-L.H*m.s,m.y));
+    st.style.transform=`translate(${m.x}px,${m.y}px) scale(${m.s})`};
+  const zoomAt=(px,py,k)=>{const m=UI.mv,ns=Math.max(minS,Math.min(1.8,m.s*k));k=ns/m.s;m.x=px-(px-m.x)*k;m.y=py-(py-m.y)*k;m.s=ns;ap()};
+  UI.mvZoom=(k)=>zoomAt(W/2,H/2,k);UI.mvFit=()=>{UI.mv={s:minS,x:(W-L.W*minS)/2,y:(H-L.H*minS)/2};ap()};
+  ap();
+  const pts=new Map();let last=null,moved=0;const r=()=>v.getBoundingClientRect();
+  const mid=()=>{const a=[...pts.values()];return a.length>1?{x:(a[0].x+a[1].x)/2,y:(a[0].y+a[1].y)/2,d:Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y)}:{x:a[0].x,y:a[0].y,d:0}};
+  v.onpointerdown=e=>{pts.set(e.pointerId,{x:e.clientX,y:e.clientY});last=mid();if(pts.size===1)moved=0};
+  v.onpointermove=e=>{if(!pts.has(e.pointerId))return;pts.set(e.pointerId,{x:e.clientX,y:e.clientY});const n=mid(),m=UI.mv,b=r();
+    if(pts.size>1&&last.d&&n.d)zoomAt(n.x-b.left,n.y-b.top,n.d/last.d);
+    m.x+=n.x-last.x;m.y+=n.y-last.y;moved+=Math.abs(n.x-last.x)+Math.abs(n.y-last.y);last=n;ap()};
+  const up=e=>{pts.delete(e.pointerId);last=pts.size?mid():null};v.onpointerup=up;v.onpointercancel=up;v.onpointerleave=up;
+  v.onwheel=e=>{e.preventDefault();const b=r();zoomAt(e.clientX-b.left,e.clientY-b.top,e.deltaY<0?1.15:1/1.15)};
+  v.addEventListener('click',e=>{if(moved>10){e.stopPropagation();e.preventDefault()}},true)}
+function vSkills(){
+  const b=BR.find(x=>x.id===S.sk.br)||BR[0],nodes=b.nodes.map(n=>SKI[n[0]]),rk=rank(),total=SKN.filter(o=>ST[o.id]==='done').length;
+  const H=nodes.length*100+30,X=i=>50+24*Math.sin(i*Math.PI/2),Y=i=>50+i*100;
+  const pts=nodes.map((_,i)=>[X(i),Y(i)]);
+  const pathTo=k=>pts.slice(0,k+1).map((p,i)=>i?`C${pts[i-1][0]} ${pts[i-1][1]+50} ${p[0]} ${p[1]-50} ${p[0]} ${p[1]}`:`M${p[0]} ${p[1]}`).join(' ');
+  const nDone=nodes.filter(o=>ST[o.id]==='done').length,front=nodes.find(o=>ST[o.id]==='open');
+  const firstReq=(nodes[0].req||[]).filter(r=>ST[r]!=='done');
+  const f=S.sk.focus&&SKI[S.sk.focus];
+  return `
+   <div class="card stack">
+    <div class="rank"><div class="badge">${rk.i+1}</div><div class="grow"><p class="label">Rank</p><h2>${rk.name}</h2><p class="small muted">${rk.x} XP · ${total}/${SKN.length} skills</p></div></div>
+    <div class="bar"><i style="width:${rk.pct*100}%"></i></div>
+    <p class="small muted">${rk.next?`${rk.next[0]-rk.x} XP to ${rk.next[1]}. `:''}Harder skills give more XP. Pull-ups and dips you log anywhere in the app count automatically.</p>
+   </div>
+   ${f?`<button class="card stack" data-a="sknode" data-id="${f.id}" style="text-align:left;width:100%"><div class="row between"><p class="label">Your focus</p><span class="tag v">${brOf(f).n}</span></div><h3>${f.n} · ${stdTxt(f)}</h3>${skBar(f)}</button>`:`<p class="hint">Tap a skill and press <b>Make this my focus</b>. It shows up on Today and on your Thursday circuit.</p>`}
+   <div class="seg">${[['map','Whole tree'],['branch','One branch']].map(([k,l])=>`<button class="${(UI.skView||'map')===k?'on':''}" data-a="skview" data-v="${k}">${l}</button>`).join('')}</div>
+   ${(UI.skView||'map')==='map'?`<div class="card stack">${vSkillMap(false)}</div>${UI.mapFS?vSkillMap(true):''}`:`<div class="brs">${BR.map(x=>{const ns=x.nodes.map(n=>n[0]),d=ns.filter(id=>ST[id]==='done').length;return `<button class="${x.id===b.id?'on':''}" data-a="skbr" data-b="${x.id}"><b>${x.n}</b><small>${d}/${ns.length}${!d&&ST[ns[0]]==='locked'?' · locked':''}</small><div class="bar"><i style="width:${d/ns.length*100}%"></i></div></button>`}).join('')}</div>
+   <div class="card stack">
+    <div class="row between"><div><p class="label">Goal</p><h3>${b.goal}</h3></div><span class="num" style="font-size:22px">${nDone}/${nodes.length}</span></div>
+    ${firstReq.length?`<p class="hint">This branch opens after: ${firstReq.map(r=>`<b>${SKI[r].n}, ${stdTxt(SKI[r])}</b> (${brOf(SKI[r]).n})`).join(' and ')}.</p>`:''}
+    <div class="tree" style="height:${H}px">
+     <svg viewBox="0 0 100 ${H}" preserveAspectRatio="none" aria-hidden="true">
+      <path d="${pathTo(nodes.length-1)}" fill="none" stroke="var(--line)" stroke-width="6" stroke-linecap="round" stroke-dasharray="1 11" vector-effect="non-scaling-stroke"/>
+      ${nDone?`<path d="${pathTo(Math.min(nDone,nodes.length-1))}" fill="none" stroke="var(--accent)" stroke-width="6" stroke-linecap="round" vector-effect="non-scaling-stroke"/>`:''}
+     </svg>
+     ${nodes.map((o,i)=>{const s=ST[o.id],bst=skBest(o),p=s==='done'?1:Math.min(1,bst.v/o.v);
+      return `<button class="sknode ${s}${o===front?' front':''}" style="left:${X(i)}%;top:${Y(i)}px" data-a="sknode" data-id="${o.id}" aria-label="${esc(o.n)}, ${stdTxt(o)}, ${s==='done'?'mastered':s==='locked'?'locked':'open'}">
+       <span class="disc" style="--p:${s==='locked'?0:p}"><span>${s==='done'?I.check:s==='locked'?LOCK:discTxt(o)}</span></span>${S.sk.focus===o.id?'<span class="fb">focus</span>':''}
+       <span class="sklbl ${X(i)>55?'l':'r'}"><b>${o.n}</b><small>${stdTxt(o)} · Lv ${o.tier}${s==='open'&&bst.v?` · best ${bst.v}`:''}</small>${(o.req||[]).map(r=>`<span class="sklink">← needs ${esc(SKI[r].n)} (${brOf(SKI[r]).n})</span>`).join('')}${SKN.filter(c=>c.br!==o.br&&(c.req||[]).includes(o.id)).map(c=>`<span class="sklink">→ opens ${esc(c.n)} (${brOf(c).n})</span>`).join('')}</span></button>`}).join('')}
+    </div>
+   </div>`}`;
+}
+function skBar(o){const b=skBest(o);return `<div class="bar"><i style="width:${Math.min(100,b.v/o.v*100)}%"></i></div><p class="small muted">${b.v?`Best ${b.v}${o.t==='hold'?' s':o.t==='wt'?` reps at +${o.kg} kg`:' reps'} (${b.src}, ${fmtDate(b.d)}) of ${o.v}`:'Nothing logged yet'}</p>`}
+function skSheet(s){
+  const o=SKI[s.id],st=ST[o.id],b=brOf(o),hist=skHist(o).slice(-6).reverse(),prev=o.i?SKI[b.nodes[o.i-1][0]]:null;
+  const need=[...(prev&&ST[prev.id]!=='done'?[prev]:[]),...(o.req||[]).map(r=>SKI[r]).filter(r=>ST[r.id]!=='done')];
+  const reqs=(o.req||[]).map(r=>SKI[r]);
+  const log=o.t==='hold'?`<div class="holdclock" id="holdclock">${UI.hold&&UI.hold.id===o.id?((Date.now()-UI.hold.t0)/1000).toFixed(1):'0.0'}</div>
+     <button class="btn ${UI.hold&&UI.hold.id===o.id?'':'primary'} block" data-a="skhold">${UI.hold&&UI.hold.id===o.id?'Stop':'Start timer'}</button>
+     <div class="row"><input class="num grow" id="skV" type="number" inputmode="decimal" placeholder="seconds" value="${s.v||''}" aria-label="Seconds held"><button class="btn primary" data-a="sklog">Log</button></div>`
+   :o.t==='wt'?`<div class="row"><input class="num grow" id="skKg" type="number" inputmode="decimal" step="0.5" placeholder="+kg" value="${o.kg}" aria-label="Added kg"><input class="num grow" id="skV" type="number" inputmode="numeric" placeholder="reps" aria-label="Reps"><button class="btn primary" data-a="sklog">Log</button></div>`
+   :`<div class="row"><input class="num grow" id="skV" type="number" inputmode="numeric" placeholder="reps${o.each?' (weaker side)':''}" aria-label="Reps"><button class="btn primary" data-a="sklog">Log attempt</button></div>`;
+  const hlTxt=(()=>{const k=o.ill&&o.ill.startsWith('p:')&&window.POSES&&POSES[o.ill.slice(2)];if(!k||!k.hl)return '';const N={fore:'grip',lats:'lats',arms:'arms',delts:'shoulders',chest:'chest',core:'core',quads:'hip flexors',legs:'legs',glutes:'glutes',lowback:'lower back'};return `<p class="small muted" style="margin-top:-4px"><span style="color:var(--accent);font-weight:700">Orange</span> = doing the work: ${k.hl.map(x=>N[x]||x).join(', ')}</p>`})();
+  return `${o.ill?illMedia(o.ill,'big'):''}${hlTxt}
+   <div class="row between" style="align-items:flex-start"><div><p class="label">${b.n} · Level ${o.tier}, ${TIERS[o.tier]} · ${o.tier*10} XP</p><h2>${o.n}</h2></div><span class="chip ${st==='done'?'good':st==='open'?'hot':''}">${st==='done'?'Mastered':st==='open'?'Open':'Locked'}</span></div>
+   <div class="card raise stack"><p class="label">Standard to pass</p><div class="num" style="font-size:32px">${stdTxt(o)}</div>${skBar(o)}${o.each?'<p class="small muted">Each side: log your weaker side.</p>':''}</div>
+   ${reqs.length?`<div class="stack" style="gap:6px"><p class="label">Also needs</p>${reqs.map(r=>`<button class="pill-toggle${ST[r.id]==='done'?' on':''}" data-a="sknode" data-id="${r.id}"><span class="bx">${ST[r.id]==='done'?I.check:''}</span><span class="grow">${r.n}, ${stdTxt(r)}<br><span class="small muted">${brOf(r).n} branch</span></span></button>`).join('')}</div>`:''}
+   ${o.how?`<div class="stack" style="gap:4px"><p class="label">Form</p><p class="small">${o.how}</p></div>`:''}
+   <div class="stack" style="gap:4px"><p class="label">How to train it</p><p class="small">${o.train}</p></div>
+   ${(window.TIPS&&TIPS[o.id]||[]).length?`<div class="stack" style="gap:4px"><p class="label">Tips</p><ul class="tips">${TIPS[o.id].map(t=>`<li>${t}</li>`).join('')}</ul></div>`:''}
+   ${st==='locked'?`<p class="hint">Unlocks after: ${need.map(r=>`<b>${r.n}, ${stdTxt(r)}</b>`).join(' and ')}.</p>`:`<div class="stack"><p class="label">${st==='done'?'Log another attempt':'Test it'}</p>${log}</div>`}
+   ${hist.length?`<div><p class="label">Your attempts</p><div class="list">${hist.map(a=>`<div class="li"><span class="grow small">${fmtDate(a.d)}${a.src?` <span class="muted">· ${a.src}</span>`:''}</span><span class="num" style="font-size:18px">${o.t==='wt'?'+'+a.kg+' kg × '+a.v:a.v+(o.t==='hold'?' s':'')}</span></div>`).join('')}</div></div>`:''}
+   <div class="grid2">${st!=='done'?`<button class="btn${S.sk.focus===o.id?' primary':''}" data-a="skfocus" data-id="${o.id}">${S.sk.focus===o.id?'Focus ✓':'Make this my focus'}</button><button class="btn ghost" data-a="skmanual" data-id="${o.id}">I've done this before</button>`:`<button class="btn ghost" data-a="skunmanual" data-id="${o.id}" ${S.sk.manual[o.id]?'':'disabled'}>${S.sk.manual[o.id]?'Undo "done before"':'Mastered from your logs'}</button>`}</div>`;
+}
+// Everything that counts toward a skill, from anywhere in the app.
+function skHist(o){const h=(S.sk.att[o.id]||[]).map(a=>({...a,src:''}));
+  if(o.mx&&o.t!=='wt'){(S.gtg.max[o.mx]||[]).forEach(m=>{if(m.src!=='set')h.push({d:m.d,v:m.v,src:m.src==='gym'?'gym':'max test'})});
+    Object.entries(S.gtg.days).forEach(([d,g])=>(g[o.mx]||[]).forEach(v=>h.push({d,v,src:'daily reps'})))}
+  if(o.lib)S.log.forEach(l=>o.lib.forEach(id=>(l.ex[id]||[]).forEach(([kg,r])=>{if(o.t!=='wt'||kg>=o.kg)h.push({d:l.d,v:r,kg,src:'gym'})})));
+  return h.sort((a,b)=>a.d<b.d?-1:a.d>b.d?1:0)}
+
+/* ===================== Plateau check (suggestions only) ===================== */
+function avgSleep(n){const v=[];for(let i=0;i<n;i++){const s=S.sleep[addDays(TODAY,-i)];if(s!=null)v.push(s)}return v.length>=4?v.reduce((a,b)=>a+b,0)/v.length:null}
+function stalls(){
+  const ids=new Set();S.log.forEach(l=>Object.keys(l.ex).forEach(id=>ids.add(id)));const out=[];
+  ids.forEach(id=>{const ses=[...S.log].sort((a,b)=>a.d<b.d?-1:1).filter(l=>(l.ex[id]||[]).some(s=>s[0]>0)).map(l=>({d:l.d,v:Math.max(...l.ex[id].filter(s=>s[0]>0).map(([kg,r])=>e1(kg,r)))}));
+    if(ses.length<4)return;let pi=0;ses.forEach((s,i)=>{if(s.v>ses[pi].v+0.01)pi=i});
+    const since=ses.length-1-pi;if(since>=3&&diffDays(ses[pi].d,TODAY)>=14)out.push({id,since,pr:ses[pi]})});
+  return out;
+}
+function stallIdeas(x){
+  const d=def(x.id),pm=primary(d),others=Object.keys(LIB).map(def).filter(a=>a.id!==d.id&&primary(a)===pm);
+  const alt=others.find(a=>a.g===d.g)||others[0],sets=(S.program.flatMap(p=>p.ex).find(e=>e.x===x.id)||{}).s||2;
+  const o=[],rate=weeklyRate(),sl=avgSleep(14);
+  if(rate!=null&&rate<-0.1&&S.profile.goal!=='cut')o.push(`Your weight is dropping (${rate.toFixed(2)} kg a week). Lifts often stall in a deficit, so eating up to your target may fix it on its own.`);
+  if(sl!=null&&sl<7)o.push(`You've averaged ${sl.toFixed(1)} h of sleep over two weeks. That alone can stall progress.`);
+  o.push(d.r[1]<=10?`Switch to ${d.r[1]+2}–${d.r[1]+6} reps with a lighter load for 3–4 weeks, then go back.`:`Go heavier: ${Math.max(5,d.r[0]-4)}–${d.r[0]} reps for 3–4 weeks.`);
+  if(sets<3)o.push('Add a third set for a few weeks.');
+  if(alt)o.push(`Swap to ${alt.n} for a block. A new variation often restarts progress.`);
+  o.push('Or take one lighter week (same exercises, about 60% of the sets), then test again.');
+  return o;
+}
+
+/* ===================== Better day ===================== */
+function sessMus(p){const o={};p.ex.forEach(e=>Object.entries(def(e.x).m).forEach(([k,v])=>o[k]=(o[k]||0)+v*e.s));return o}
+function overlapMus(a,b){if(!a||!b)return [];const A=sessMus(a),B=sessMus(b);return Object.keys(A).filter(k=>B[k]).map(k=>[k,Math.min(A[k],B[k])]).filter(x=>x[1]>=1.5)}
+function betterDays(from,p){
+  const at=d=>d===from?null:dayForDate(d),c=[];
+  for(let i=1;i<=7;i++){const d=addDays(from,i);if(d<TODAY||d===from||at(d))continue;
+    const pv=at(addDays(d,-1)),nx=at(addDays(d,1)),o1=overlapMus(p,pv),o2=overlapMus(p,nx);
+    const sun=parse(d).getDay()===0,score=o1.concat(o2).reduce((a,x)=>a+x[1],0)+(sun?4:0)+i*0.6;
+    const why=[];if(o1.length)why.push(`${o1.map(x=>MUSC[x[0]].toLowerCase()).join(', ')} also trained the day before (${pv.name})`);
+    if(o2.length)why.push(`${o2.map(x=>MUSC[x[0]].toLowerCase()).join(', ')} trained the day after (${nx.name})`);
+    if(sun)why.push('Sunday is your full rest day');
+    c.push({d,score,why:why.length?why.join('. ')+'.':'Rest day, and nothing on either side trains the same muscles.',clean:!why.length})}
+  return c.sort((a,b)=>a.score-b.score).slice(0,3);
+}
+function missedYesterday(){const y=addDays(TODAY,-1),p=dayForDate(y);if(!p||S.log.some(l=>l.d===y)||S.resched[y]===null)return null;
+  if(Object.entries(S.resched).some(([d,id])=>d>=TODAY&&id===p.id))return null;return {d:y,p}}
+
+/* ===================== Monthly recap ===================== */
+const MON=['January','February','March','April','May','June','July','August','September','October','November','December'];
+function recapMonths(){const s=new Set();S.log.forEach(l=>s.add(l.d.slice(0,7)));S.weights.filter(w=>!w.sample).forEach(w=>s.add(w.d.slice(0,7)));Object.keys(S.gtg.days).forEach(d=>{const g=S.gtg.days[d];if(Object.values(g).some(a=>a&&a.length))s.add(d.slice(0,7))});return [...s].sort().reverse()}
+function recap(ym){
+  const inM=d=>d&&d.startsWith(ym),logs=S.log.filter(l=>inM(l.d));let sets=0,ton=0;
+  logs.forEach(l=>Object.values(l.ex).forEach(ss=>ss.forEach(([kg,r])=>{sets++;ton+=kg*r})));
+  const pre={},mon={};S.log.forEach(l=>Object.entries(l.ex).forEach(([id,ss])=>ss.forEach(([kg,r])=>{if(!kg)return;const v=e1(kg,r),t=l.d<ym?pre:inM(l.d)?mon:null;if(t&&(!t[id]||v>t[id].v))t[id]={v,kg,r}})));
+  const jumps=Object.keys(mon).filter(id=>pre[id]&&mon[id].v>pre[id].v+0.01).map(id=>({id,from:pre[id],to:mon[id],pct:(mon[id].v/pre[id].v-1)*100})).sort((a,b)=>b.pct-a.pct);
+  const ts=trendSeries().filter(x=>inM(x.d)&&!x.sample),wch=ts.length>1?ts[ts.length-1].t-ts[0].t:null;
+  const wa=S.waist.filter(w=>inM(w.d)),wach=wa.length>1?wa[wa.length-1].cm-wa[0].cm:null;
+  let reps=0;Object.entries(S.gtg.days).forEach(([d,g])=>{if(inM(d))Object.values(g).forEach(a=>(a||[]).forEach(v=>reps+=v))});
+  const skills=SKN.filter(o=>inM(S.sk.done[o.id])&&!S.sk.manual[o.id]),circ=S.circLog.filter(c=>inM(c.d));
+  const cindy=circ.filter(c=>c.id==='cindy').map(c=>c.score);
+  return {ym,days:new Set(logs.map(l=>l.d)).size,sets,ton,jumps,wch,wach,reps,skills,circ:circ.length,cindy:cindy.length?Math.max(...cindy):null};
+}
+function recapSheet(s){
+  const ms=recapMonths();if(!ms.length)return '<h2>Monthly recap</h2><p class="small muted">Log a workout first.</p>';
+  const ym=s.ym||ms[0],r=recap(ym),[y,m]=ym.split('-'),cur=ym===TODAY.slice(0,7);
+  const sg=v=>(v>0?'+':'')+v.toFixed(1);
+  return `<div class="poster" style="min-height:0"><div class="poster-body" style="max-width:100%"><p class="label">${cur?'So far this month':'Monthly recap'}</p><h1>${MON[+m-1]}</h1><p class="num" style="font-size:22px">${y}</p></div></div>
+   ${ms.length>1?`<div class="brs">${ms.map(x=>`<button class="${x===ym?'on':''}" data-a="recapm" data-m="${x}"><b>${MON[+x.slice(5)-1].slice(0,3)} ${x.slice(0,4)}</b></button>`).join('')}</div>`:''}
+   <div class="tiles">
+    <div class="tile hot"><p class="label">Sessions</p><div class="v">${r.days}</div></div>
+    <div class="tile hot"><p class="label">Records</p><div class="v">${r.jumps.length}</div></div>
+    <div class="tile"><p class="label">Hard sets</p><div class="v">${r.sets}</div></div>
+    <div class="tile"><p class="label">Kg moved</p><div class="v">${r.ton>=1000?(r.ton/1000).toFixed(1)+'t':fmt(r.ton)}</div></div>
+    <div class="tile"><p class="label">Weight trend</p><div class="v">${r.wch==null?'–':sg(r.wch)}</div></div>
+    <div class="tile"><p class="label">Waist</p><div class="v">${r.wach==null?'–':sg(r.wach)}</div></div>
+    <div class="tile"><p class="label">Daily reps</p><div class="v">${fmt(r.reps)}</div></div>
+    <div class="tile"><p class="label">Skills unlocked</p><div class="v">${r.skills.length}</div></div>
+   </div>
+   ${r.jumps.length?`<div class="card stack"><h3>Biggest jumps</h3><div class="list">${r.jumps.slice(0,5).map(j=>`<div class="li"><span class="grow small"><b>${def(j.id).n}</b><br><span class="muted">${j.from.kg}×${j.from.r} → ${j.to.kg}×${j.to.r}</span></span><span class="num" style="font-size:20px;color:var(--mint)">+${j.pct.toFixed(0)}%</span></div>`).join('')}</div></div>`:''}
+   ${r.skills.length?`<div class="card stack"><h3>Skills unlocked</h3><p class="small">${r.skills.map(o=>`<b>${o.n}</b> (${brOf(o).n})`).join(', ')}</p></div>`:''}
+   ${r.circ?`<p class="small muted">${r.circ} circuit${r.circ>1?'s':''}${r.cindy!=null?`, best Cindy ${r.cindy} rounds`:''}.</p>`:''}
+   <p class="small muted">Records count lifts where your estimated 1-rep max beat everything before this month.</p>`;
+}
+
+skSync(false);
+if(!S.resched)S.resched={};
+if(!S.neck)S.neck=[];if(!S.bfLook)S.bfLook={};
+
+/* ===================== Render ===================== */
+// The screens and render() live in ui-core.js and ui-more.js, loaded last. These stubs cover the moment before they load.
+function render(){}
+function renderSheet(){}
+function renderTimer(){}
+
+/* ===================== Actions ===================== */
+// Every entry gets a meal id (g) and the time it was logged (t, minutes since midnight), which sorts it into breakfast, lunch, snack or dinner.
+// New food goes to today, or to the past day you are looking at on the Food screen (that one gets no time, so it lands under "Logged").
+const foodDayNow=()=>UI.tab==='eat'&&UI.foodDay&&UI.foodDay<TODAY?UI.foodDay:TODAY;
+const pushFood=e=>{const d=e.auto?TODAY:foodDayNow();e=e.g||e.auto?e:{...e,g:newG()};if(e.t==null&&d===TODAY)e={...e,t:nowMin()};(S.food[d]=S.food[d]||[]).push(e)};
+function putWeight(d,kg,t,fasted){S.weights=S.weights.filter(w=>w.d!==d&&!w.sample);S.weights.push({d,kg,t,fasted});S.weights.sort((a,b)=>a.d<b.d?-1:1);save()}
+function logWeight(v){if(!(v>40&&v<150))return toast('Enter your weight in kg, e.g. 76.4');const t=nowHM();
+  if(!isMorning(t)){UI.sheet={kind:'wconfirm',kg:v,t};renderSheet();return}
+  putWeight(TODAY,v,t,true);render();toast('Weigh-in saved')}
+function newSets(d,n){const sg=suggest(d);return Array.from({length:n},()=>({kg:sg.kg,reps:'',done:false}))}
+function applySwap(id){const s=UI.sheet;const d=def(id);
+  const keep=s.mode.startsWith('active')&&UI.swapKeep,pd=keep&&S.program.find(p=>p.id===S.active.day);let kept=false;
+  if(s.mode==='active'){const x=S.active.list[s.x];S.active.list[s.x]={id,sets:newSets(d,x.sets.length)};S.active.edited=true;
+    if(pd){const pe=pd.ex.find(e=>e.x===x.id);if(pe){pe.x=id;kept=true}}}
+  if(s.mode==='activeadd'){S.active.list.push({id,sets:newSets(d,2)});S.active.edited=true;if(pd){pd.ex.push({x:id,s:2});kept=true}}
+  if(s.mode==='plan'){S.program.find(p=>p.id===s.day).ex[s.x].x=id}
+  if(s.mode==='planadd'){S.program.find(p=>p.id===s.day).ex.push({x:id,s:2})}
+  save();UI.swapQ='';UI.sheet=s.mode.startsWith('plan')?{kind:'editday',day:s.day}:null;render();toast((s.mode.endsWith('add')?'Added ':'Swapped in ')+d.n+(s.mode.startsWith('plan')||kept?', saved to plan':', today only'))}
+const A={
+ tab:t=>{UI.tab=t.dataset.t;if(t.dataset.ct)UI.caliTab=t.dataset.ct;UI.foodQ='';render();scrollTo(0,0)},
+ settings:()=>{UI.sheet={kind:'settings'};renderSheet()},
+ closesheet:()=>{if(UI.sheet&&UI.sheet.kind==='wlog')cleanLog();UI.sheet=null;UI.swapQ='';render()},
+ wlog:t=>{UI.sheet={kind:'wlog',e:S.log[+t.dataset.li]};renderSheet()},
+ lgadd:t=>{const s=UI.sheet.e.ex[t.dataset.id],l=s[s.length-1]||[0,0];s.push([l[0],0]);save();renderSheet()},
+ lgrm:t=>{UI.sheet.e.ex[t.dataset.id].splice(+t.dataset.i,1);save();renderSheet()},
+ lgdel:()=>{UI.sheet.confirm=true;renderSheet()}, lgdelno:()=>{UI.sheet.confirm=false;renderSheet()},
+ lgdelyes:()=>{const i=S.log.indexOf(UI.sheet.e),e=UI.sheet.e;if(i>=0)S.log.splice(i,1);UI.sheet=null;save();render();toast('Session deleted',()=>{S.log.push(e);sortLog();save();render()})},
+ wpast:()=>{UI.sheet={kind:'wpast'};renderSheet()},
+ wpastgo:t=>{const p=S.program.find(x=>x.id===t.dataset.id),ex={};p.ex.forEach(({x,s})=>{const sg=suggest(def(x));ex[x]=Array.from({length:s},()=>[+sg.kg||0,0])});
+   const e={d:addDays(TODAY,-1),day:p.id,ex};S.log.push(e);sortLog();save();UI.sheet={kind:'wlog',e};renderSheet()},
+ exlib:()=>{UI.sheet={kind:'exlib'};renderSheet()}, libm:t=>{UI.libM=t.dataset.m;renderSheet()},
+ exinfo:t=>{const back=UI.sheet&&UI.sheet.kind==='exlib';UI.sheet={kind:'exinfo',id:t.dataset.id,back};renderSheet();const sh=document.querySelector('.sheet');if(sh)sh.scrollTop=0},
+ set:t=>{S.profile[t.dataset.f]=t.dataset.v;save();render()},
+ reset:()=>{UI.sheet.confirm=true;renderSheet()}, resetno:()=>{UI.sheet.confirm=false;renderSheet()},
+ resetyes:()=>{S=seed();save();UI.sheet=null;render();toast('Reset to the starting data')},
+ logw:()=>logWeight(parseFloat($('#wIn').value)), logw2:()=>logWeight(parseFloat($('#wIn2').value)),
+ logsleep:()=>{const v=parseFloat($('#slIn').value);if(!(v>=0&&v<16))return;S.sleep[TODAY]=v;save();render()},
+ stepsheet:()=>{UI.sheet={kind:'steps'};renderSheet()},
+ logsteps:()=>{const v=parseInt($('#stIn').value);if(!(v>=0))return;S.steps[TODAY]=v;UI.sheet=null;save();render()},
+ supp:t=>{const k=t.dataset.k,s=S.supps[TODAY]=S.supps[TODAY]||{};s[k]=!s[k];
+   if(k==='cr'&&s.cr&&!S.profile.creatineStart){S.profile.creatineStart=TODAY;toast('Creatine start date saved')}
+   if(k==='wh'){if(s.wh)pushFood({n:'Whey protein',k:120,pr:24,c:3,f:2,x:1,auto:'wh'});else{const a=S.food[TODAY]||[];const i=a.findIndex(e=>e.auto==='wh');if(i>=0)a.splice(i,1)}}
+   save();render()},
+ logwaist:()=>{const v=parseFloat($('#waIn').value);if(!(v>50&&v<150))return toast('Enter your waist in cm');S.waist=S.waist.filter(w=>w.d!==TODAY);S.waist.push({d:TODAY,cm:v});save();render();toast('Waist saved')},
+ logneck:()=>{const v=parseFloat($('#nkIn').value);if(!(v>25&&v<60))return toast('Enter your neck in cm');S.neck=S.neck.filter(w=>w.d!==TODAY);S.neck.push({d:TODAY,cm:v});save();render();toast('Neck saved')},
+ bflook:t=>{const i=+t.dataset.i;if(S.bfLook[TODAY]===i)delete S.bfLook[TODAY];else S.bfLook[TODAY]=i;save();render()},
+ logarm:()=>{const v=parseFloat($('#arIn').value);if(!(v>20&&v<60))return toast('Enter your arm in cm');S.arm=S.arm.filter(w=>w.d!==TODAY);S.arm.push({d:TODAY,cm:v});save();render();toast('Arm saved')},
+ demo:()=>{[75.6,75.9,75.4,76.1,76.0,76.4,76.2,76.6,76.5,76.9].forEach((kg,i)=>S.weights.push({d:addDays(TODAY,i-9),kg,sample:true}));save();render()},
+ clearsample:()=>{S.weights=S.weights.filter(w=>!w.sample);save();render()},
+ applyadj:t=>{const p=S.profile,v=+t.dataset.v,basis=measuredTDEE()?'meas':'est';if(p.ciLast&&diffDays(p.ciLast,TODAY)<7)return;
+   if((p.adjOn||'est')!==basis){p.kcalAdj=0;p.adjOn=basis}p.kcalAdj=(p.kcalAdj||0)+v;p.ciPrev=p.ciLast||null;p.ciLast=TODAY;p.ciAdj=v;save();render();toast('Target is now '+fmt(targets().k)+' kcal')},
+ undoadj:()=>{const p=S.profile;if(p.ciLast!==TODAY)return;p.kcalAdj=(p.kcalAdj||0)-p.ciAdj;p.ciLast=p.ciPrev||null;p.ciAdj=0;save();render();toast('Change undone')},
+ photodone:()=>{S.profile.photoLast=TODAY;save();render();toast('Next photos due '+fmtDate(addDays(TODAY,14)))},
+ wyes:()=>{const s=UI.sheet;putWeight(TODAY,s.kg,s.t,true);UI.sheet=null;render();toast('Weigh-in saved')},
+ wno:()=>{const s=UI.sheet;putWeight(TODAY,s.kg,s.t,false);UI.sheet=null;render();toast('Saved, kept out of the trend')},
+ wedit:()=>{UI.sheet={kind:'wedit'};renderSheet()},
+ wdel:t=>{S.weights=S.weights.filter(w=>w.d!==t.dataset.d);save();render()},
+ wtog:t=>{const w=S.weights.find(w=>w.d===t.dataset.d);if(w){w.fasted=w.fasted===false?true:false;save();render()}},
+ wadd:()=>{const d=$('#wdD').value,v=parseFloat($('#wdK').value);if(!d||d>TODAY)return toast('Pick a date up to today');if(!(v>40&&v<150))return toast('Enter your weight in kg, e.g. 76.4');
+   putWeight(d,v,null,$('#wdF').checked);render();toast('Saved for '+fmtDate(d))},
+ exportdata:async()=>{const json=JSON.stringify({app:'recomp-coach',key:KEY,saved:new Date().toISOString(),data:S},null,1),name='recomp-backup-'+TODAY+'.json';
+   if(window.NX&&NX.native){if(await NX.exportFile(json,name)){S.lastBackup=TODAY;save();renderSheet()}return}
+   const blob=new Blob([json],{type:'application/json'});
+   // iPhone: the share sheet (Save to Files, AirDrop, WhatsApp...) instead of a raw download.
+   try{const f=new File([blob],name,{type:'application/json'});if(navigator.canShare&&navigator.canShare({files:[f]})&&/iP(hone|ad|od)|Macintosh/.test(navigator.userAgent)&&'ontouchend' in document){
+     await navigator.share({files:[f],title:'Tally backup'});S.lastBackup=TODAY;save();renderSheet();toast('Backup saved');return}}catch(e){if(e&&e.name==='AbortError')return}
+   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();a.remove();
+   S.lastBackup=TODAY;save();renderSheet();toast('Backup downloaded')},
+ importyes:()=>{S=UI.sheet.pending;S.meals=S.meals||[];S.wuAlt=S.wuAlt||{};if(!S.resched)S.resched={};if(!S.neck)S.neck=[];if(!S.bfLook)S.bfLook={};save();UI.sheet=null;render();toast('Backup restored')},
+ importno:()=>{UI.sheet.pending=null;renderSheet()},
+ mapmode:t=>{UI.mapMode=t.dataset.v;render()},
+ // workout
+ startday:t=>{if(S.active&&S.active.day!==t.dataset.id){UI.tab='train';render();return toast('Finish or discard the current workout first')}
+   if(!S.active){const p=S.program.find(x=>x.id===t.dataset.id);S.active={day:p.id,d:TODAY,start:Date.now(),edited:false,keep:false,list:p.ex.map(e=>({id:e.x,sets:newSets(def(e.x),e.s)}))};save()}
+   UI.tab='train';render();scrollTo(0,0)},
+ toggleset:t=>{const x=S.active.list[+t.dataset.x],s=x.sets[+t.dataset.i];
+   if(!s.done&&s.reps==='')return toast('Enter reps first');s.done=!s.done;
+   if(s.done){const d=def(x.id),r=records()[x.id],kg=+s.kg||0;if(kg&&(!r||e1(kg,+s.reps)>r.v+0.01))toast('New record on '+d.n+': '+kg+'×'+s.reps);if(S.profile.restTimer)UI.timerEnd=Date.now()+d.rest*1000;buzz(30)}
+   save();render()},
+ settip:t=>{UI.tip=UI.tip===t.dataset.k?null:t.dataset.k;render()},
+ wutick:t=>{const a=S.active,i=+t.dataset.i;a.wu=a.wu||[];a.wu[i]=!a.wu[i];save();render()},
+ wualt:t=>{const day=S.active.day,i=+t.dataset.i;S.wuAlt[day]=S.wuAlt[day]||{};S.wuAlt[day][i]=(S.wuAlt[day][i]||0)+1;save();render()},
+ addset:t=>{const x=S.active.list[+t.dataset.x];const l=x.sets[x.sets.length-1]||{kg:''};x.sets.push({kg:l.kg,reps:'',done:false});S.active.edited=true;save();render()},
+ rmset:t=>{const x=S.active.list[+t.dataset.x];if(x.sets.length>1)x.sets.pop();S.active.edited=true;save();render()},
+ exopt:t=>{UI.sheet={kind:'exopt',x:+t.dataset.x};renderSheet()},
+ exmove:t=>{const l=S.active.list,i=UI.sheet.x,j=i+(+t.dataset.d);if(j<0||j>=l.length)return;[l[i],l[j]]=[l[j],l[i]];S.active.edited=true;UI.sheet=null;save();render()},
+ exremove:()=>{S.active.list.splice(UI.sheet.x,1);S.active.edited=true;UI.sheet=null;save();render()},
+ swapopen:t=>{UI.swapQ='';const prev=UI.sheet;UI.sheet={kind:'swap',mode:t.dataset.mode,x:+t.dataset.x,day:prev&&prev.day};renderSheet()},
+ swappick:t=>applySwap(t.dataset.id),
+ swapcustom:()=>{const n=$('#cxN').value.trim();if(!n)return toast('Give it a name');const m=$('#cxM').value,id='c_'+Date.now();
+   S.customEx[id]={n,g:FIG_FOR[m],m:{[m]:1},r:[8,12],rest:90,u:'kg'};applySwap(id)},
+ cancelw:t=>{if(!UI.confirmCancel){UI.confirmCancel=true;t.textContent='Tap again to discard';setTimeout(()=>UI.confirmCancel=false,3000);return}S.active=null;UI.confirmCancel=false;UI.timerEnd=0;save();render()},
+ finishw:()=>{const a=S.active,ex={};let n=0;a.list.forEach(x=>{const d=x.sets.filter(s=>s.done&&s.reps!=='').map(s=>[+s.kg||0,+s.reps]);if(d.length){ex[x.id]=(ex[x.id]||[]).concat(d);n+=d.length}});
+   if(!n)return toast('Tick at least one set, or discard');
+   const bwp=Math.max(0,...[...(ex.pullup||[]),...(ex.chinup||[])].filter(z=>!z[0]).map(z=>z[1]));const gp=bwp&&maybePR('pull',bwp,'gym');
+   S.log.push({d:a.d,day:a.day,ex});S.active=null;if(gp)setTimeout(()=>toast('New pull-up record: '+bwp),2300);UI.timerEnd=0;save();render();toast(n+' sets saved')},
+ samelast:t=>{const x=S.active.list[+t.dataset.x],h=lastFor(x.id);if(!h)return;let n=0;
+   x.sets.forEach((s,i)=>{if(s.done)return;const p=h.sets[Math.min(i,h.sets.length-1)];s.kg=p[0]||'';s.reps=p[1];n++});save();render();toast('Filled '+n+' sets from '+fmtDate(h.d)+'. Tick each one you match.')},
+ tplus:()=>{UI.timerEnd=Math.max(UI.timerEnd,Date.now())+30000;renderTimer()}, tstop:()=>{UI.timerEnd=0;renderTimer()},
+ // plan editor
+ editday:t=>{UI.sheet={kind:'editday',day:t.dataset.id};renderSheet()},
+ pmove:t=>{const ex=S.program.find(p=>p.id===UI.sheet.day).ex,i=+t.dataset.x,j=i+(+t.dataset.d);if(j<0||j>=ex.length)return;[ex[i],ex[j]]=[ex[j],ex[i]];save();render()},
+ psets:t=>{const e=S.program.find(p=>p.id===UI.sheet.day).ex[+t.dataset.x];e.s=Math.max(1,Math.min(6,e.s+(+t.dataset.d)));save();render()},
+ prm:t=>{S.program.find(p=>p.id===UI.sheet.day).ex.splice(+t.dataset.x,1);save();render()},
+ daydow:t=>{const v=+t.dataset.v,p=S.program.find(p=>p.id===UI.sheet.day),other=S.program.find(o=>o.dow===v&&o!==p);if(other)other.dow=p.dow;p.dow=v;save();render();if(other)toast(other.name+' moved to '+DOW[other.dow])},
+ dayreset:()=>{const i=S.program.findIndex(p=>p.id===UI.sheet.day);S.program[i]=JSON.parse(JSON.stringify(DEFAULT_PROGRAM.find(p=>p.id===UI.sheet.day)));save();render();toast('Day reset')},
+ // food
+ foodmode:t=>{UI.foodMode=t.dataset.v;render()}, foodcat:t=>{UI.foodCat=t.dataset.k;render()},
+ adddesc:()=>{const g=newG();parseMeal(UI.desc).forEach(({f,x})=>pushFood({n:f.n,k:f.k,pr:f.pr,c:f.c,f:f.f,fi:f.fi||0,x,g}));UI.desc='';save();render();toast('Meal added')},
+ mealadd:t=>{const m=UI.rec[+t.dataset.i];addMeal(m.items);render();toast('Added again · '+fmt(mealK(m.items))+' kcal')},
+ mealpin:t=>{const m=UI.rec[+t.dataset.i];const i=S.meals.findIndex(x=>x.sig===m.sig);if(i>=0)S.meals.splice(i,1);else S.meals.push({sig:m.sig,items:m.items});save();render()},
+ copyyest:()=>{const gs=groupsOn(addDays(TODAY,-1));gs.forEach(gp=>addMeal(gp.items));render();toast('Copied '+gs.length+' meals from yesterday')},
+ dbgo:async()=>{const q=UI.foodQ.trim();if(q.length<2)return toast('Type what to search for');if(!window.NX||!NX.dbSearch)return;UI.db={busy:true,q};render();
+   try{UI.db={q,res:await NX.dbSearch(q)}}catch(e){UI.db={q,err:e.message||'Search failed. Are you online?'}}render()},
+ dbpick:t=>{const r=UI.db.res[+t.dataset.i];UI.sheet={kind:'food100',r,g:r.serv||100};renderSheet()},
+ dbg:t=>{UI.sheet.g=+t.dataset.g;renderSheet()},
+ dbadd:t=>{const {r}=UI.sheet,g=parseFloat($('#dbG').value);if(!(g>0))return toast('Enter grams');const x=g/100;
+   pushFood({n:r.n+' ('+g+' g)',k:r.k*x,pr:r.pr*x,c:r.c*x,f:r.f*x,fi:(r.fi||0)*x,x:1,src:r.src});
+   if(t.dataset.keep)S.myFoods.push({n:r.n,p:g+' g',k:Math.round(r.k*x),pr:Math.round(r.pr*x),c:Math.round(r.c*x),f:Math.round(r.f*x),fi:Math.round((r.fi||0)*x),src:'label',al:r.n.toLowerCase()});
+   save();UI.sheet=null;render();toast('Added '+g+' g')},
+ pickfood:t=>{const items=[...FOODS,...S.myFoods.map(f=>({...f,cat:'mine'}))];UI.sheet={kind:'food',f:items[+t.dataset.i],x:1};renderSheet()},
+ portion:t=>{UI.sheet.x=+t.dataset.x;renderSheet()},
+ addfood:()=>{const {f,x}=UI.sheet;pushFood({n:f.n,k:f.k,pr:f.pr,c:f.c,f:f.f,fi:f.fi||0,x});save();UI.sheet=null;render();toast('Added '+f.n)},
+ delfood:t=>{const d=UI.sheet&&UI.sheet.kind==='fedit'?UI.sheet.d:TODAY,i=UI.sheet&&UI.sheet.kind==='fedit'?UI.sheet.i:+t.dataset.i,e=S.food[d].splice(i,1)[0];
+   if(UI.sheet&&UI.sheet.kind==='fedit')UI.sheet=null;save();render();toast('Removed '+e.n,()=>{S.food[d].splice(i,0,e);save();render()})},
+ fedit:t=>{UI.sheet={kind:'fedit',d:TODAY,i:+t.dataset.i};renderSheet()},
+ fx:t=>{S.food[UI.sheet.d][UI.sheet.i].x=+t.dataset.x;save();render()},
+ undo:()=>{const f=toast.undo;toast.undo=null;$('#toast').innerHTML='';if(f){f();buzz(20)}},
+ quickpr:t=>{const g=+t.dataset.g;pushFood({n:'Protein, quick add',k:g*5,pr:g,c:0,f:0,x:1});save();render()},
+ customfood:()=>{UI.sheet={kind:'custom'};renderSheet()},
+ savecustom:()=>{const n=$('#cfN').value.trim(),k=+$('#cfK').value;if(!n||!k)return toast('Name and kcal are required');
+   const f={n,p:$('#cfP').value.trim()||'1 serving',k,pr:+$('#cfPr').value||0,c:+$('#cfC').value||0,f:+$('#cfF').value||0,src:$('#cfS').value||undefined,url:$('#cfU').value.trim()||undefined,al:n.toLowerCase()};
+   S.myFoods.push(f);pushFood({n:f.n,k:f.k,pr:f.pr,c:f.c,f:f.f,x:1});save();UI.sheet=null;UI.foodCat='mine';render();toast('Saved to My items')},
+ // calisthenics
+ gtglog:t=>{const m=t.dataset.m,v=parseInt($('#gtg-'+m).value);if(!(v>0))return toast('Enter how many you did');const g=gtgDay(TODAY);(g[m]=g[m]||[]).push(v);gtgMark();const pr=BIG3.some(b=>b[0]===m)&&maybePR(m,v,'set');save();render();buzz(pr?[40,60,40]:30);toast(pr?'New record: '+v+(m==='plank'?' s ':' ')+MOVES.find(x=>x.id===m).n.toLowerCase():v+' '+MOVES.find(x=>x.id===m).n.toLowerCase()+' logged')},
+ gtgundo:t=>{const g=gtgDay(TODAY);(g[t.dataset.m]||[]).pop();save();render()},
+ gtgtoggle:t=>{const m=t.dataset.m,on=S.gtg.on,i=on.indexOf(m);i>=0?on.splice(i,1):on.push(m);save();render()},
+ remindsheet:()=>{UI.sheet={kind:'remind'};renderSheet()},
+ remindevery:t=>{S.gtg.remind.every=+t.dataset.v;save();render()},
+ maxtest:t=>{UI.pt=0;UI.sheet={kind:'max',m:t.dataset.m};renderSheet()},
+ ptime:()=>{if(UI.pt){UI.sheet.v=Math.floor((Date.now()-UI.pt)/1000);UI.pt=0;clearInterval(UI.ptI);beep(660,200);renderSheet()}else{UI.pt=Date.now();beep(1040,200);renderSheet();UI.ptI=setInterval(()=>{const c=document.getElementById('pclock');if(!UI.pt||!c)return clearInterval(UI.ptI);c.textContent=Math.floor((Date.now()-UI.pt)/1000)},250)}},
+ savemax:t=>{const v=+$('#mxIn').value;if(!v)return;const was=bestOf(t.dataset.m);(S.gtg.max[t.dataset.m]=S.gtg.max[t.dataset.m]||[]).push({d:TODAY,v});save();UI.sheet=null;render();toast((was!=null&&v>was?'New record! ':'Saved. ')+'Daily sets of '+setSize(t.dataset.m)+(t.dataset.m==='plank'?' s':'')+' from now')},
+ ladup:t=>{S.ladders[t.dataset.l]=(S.ladders[t.dataset.l]||0)+1;save();render()},
+ laddown:t=>{S.ladders[t.dataset.l]=Math.max(0,(S.ladders[t.dataset.l]||0)-1);save();render()},
+ calitab:t=>{UI.caliTab=t.dataset.v;render()},
+ skbr:t=>{S.sk.br=t.dataset.b;if(t.dataset.view){UI.skView=t.dataset.view;UI.mapFS=false;document.body.style.overflow='';scrollTo(0,0)}save();render()},
+ phcred:()=>{UI.sheet={kind:'phcred'};renderSheet()},
+ skview:t=>{UI.skView=t.dataset.v;render()},
+ mapfs:t=>{UI.mapFS=t.dataset.v==='1';UI.mv=null;document.body.style.overflow=UI.mapFS?'hidden':'';render()},
+ mapfz:t=>{UI.mvZoom&&UI.mvZoom(+t.dataset.d>0?1.3:1/1.3)},
+ mapfit:()=>{UI.mvFit&&UI.mvFit()},
+ mapzoom:t=>{const Z=[.45,.7,1],o=UI.mapZoom||1,n=Z[Math.max(0,Math.min(2,Z.indexOf(o)+ +t.dataset.d))];const w=document.getElementById('skmapwrap');
+  if(w){const cx=(w.scrollLeft+w.clientWidth/2)/o,cy=(w.scrollTop+w.clientHeight/2)/o;UI.mapScroll=[cx*n-w.clientWidth/2,cy*n-w.clientHeight/2]}UI.mapZoom=n;render()},
+ sknode:t=>{const o=SKI[t.dataset.id];UI.hold=null;UI.sheet={kind:'sk',id:o.id};renderSheet()},
+ skhold:()=>{const id=UI.sheet.id;if(UI.hold&&UI.hold.id===id){const v=Math.round((Date.now()-UI.hold.t0)/100)/10;UI.hold=null;UI.sheet.v=v;beep(660,160);renderSheet()}else{UI.hold={id,t0:Date.now()};beep(1040,200);renderSheet()}},
+ sklog:()=>{const o=SKI[UI.sheet.id],v=parseFloat($('#skV').value),kg=o.t==='wt'?parseFloat($('#skKg').value)||0:undefined;if(!(v>0))return toast(o.t==='hold'?'Enter the seconds held':'Enter how many reps');
+   UI.hold=null;
+   // Skills that are also a daily-reps move (pull-ups, push-ups, dips, plank, knee raises) log there too, so both screens always agree.
+   if(o.mx&&o.t!=='wt'){const g=gtgDay(TODAY);(g[o.mx]=g[o.mx]||[]).push(v);gtgMark();maybePR(o.mx,v,'set')}
+   else (S.sk.att[o.id]=S.sk.att[o.id]||[]).push({d:TODAY,v,kg});
+   UI.sheet.v='';save();
+   if(ST[o.id]==='done'&&UI.cele&&UI.cele.length){UI.sheet=null;render()}else{render();toast(`Logged. Best ${skBest(o).v} of ${o.v}`)}},
+ skfocus:t=>{S.sk.focus=S.sk.focus===t.dataset.id?null:t.dataset.id;save();render()},
+ skmanual:t=>{const o=SKI[t.dataset.id];S.sk.manual[o.id]=TODAY;brOf(o).nodes.slice(0,o.i+1).forEach(n=>{if(!S.sk.done[n[0]])S.sk.done[n[0]]=TODAY});save();UI.sheet=null;render();toast('Marked as done')},
+ skunmanual:t=>{delete S.sk.manual[t.dataset.id];delete S.sk.done[t.dataset.id];save();render()},
+ celeok:()=>{UI.cele.shift();renderOver()},
+ bigph:t=>{UI.sheet={kind:'bigph',id:t.dataset.id};renderSheet()},
+ recap:t=>{UI.sheet={kind:'recap',ym:t.dataset.m};renderSheet()},
+ recapm:t=>{UI.sheet.ym=t.dataset.m;renderSheet()},
+ resched:t=>{UI.sheet={kind:'resched',d:t.dataset.d};renderSheet()},
+ reschmove:t=>{const {from,to,id,past}=t.dataset;if(!past)S.resched[from]=null;S.resched[to]=id;UI.sheet=null;save();render();toast(S.program.find(x=>x.id===id).name+' moved to '+fmtDate(to))},
+ reschskip:t=>{S.resched[t.dataset.from]=null;UI.sheet=null;save();render();toast('Skipped this week')},
+ reschreset:()=>{Object.keys(S.resched).forEach(d=>{if(d>=addDays(TODAY,-1))delete S.resched[d]});UI.sheet=null;save();render();toast('Back to your normal week')},
+ circsheet:t=>{const c=CIRCUITS.find(x=>x.id===t.dataset.id);UI.sheet={kind:'circ',id:c.id,o:{work:c.work,rest:c.rest,rounds:c.rounds,min:c.min,peak:5}};renderSheet()},
+ circopt:t=>{UI.sheet.o[t.dataset.k]=+t.dataset.v;renderSheet()},
+ runstart:()=>{const c=CIRCUITS.find(x=>x.id===UI.sheet.id),o=UI.sheet.o;UI.sheet=null;renderSheet();keepAwake(true);
+   if(c.type==='amrap'){UI.run={c:{...c,min:o.min},t0:Date.now(),end:Date.now()+o.min*60000,rounds:0,phase:'go'};beep(1040,300);renderOver()}
+   else if(c.type==='ladder'){UI.run={c,t0:Date.now(),seq:ladderSeq(o.peak),peak:o.peak,step:0,phase:'go'};beep(1040,300);renderOver()}
+   else{UI.run={c:{...c,...o},round:1,i:0,t0:Date.now()};runPhase('ready',5)}},
+ amrapround:()=>{UI.run.rounds++;buzz(40);beep(880,80);renderOver()},
+ amrapundo:()=>{UI.run.rounds=Math.max(0,UI.run.rounds-1);renderOver()},
+ ladnext:()=>{const r=UI.run;r.step++;buzz(40);beep(880,80);if(r.step>=r.seq.length)finishRun(Math.round((Date.now()-r.t0)/1000));else renderOver()},
+ runfinish:()=>{const r=UI.run;finishRun(Math.round((Date.now()-r.t0)/1000))},
+ runpause:()=>{const r=UI.run;if(r.paused){r.end=Date.now()+r.left;r.paused=false}else{r.left=r.end-Date.now();r.paused=true}renderOver()},
+ runskip:()=>runAdvance(),
+ runclose:()=>{UI.run=null;keepAwake(false);render()}
+};
+document.addEventListener('click',e=>{const t=e.target.closest('[data-a]');if(!t||t.disabled)return;if(t.classList.contains('sheet-bg')&&e.target!==t)return;const f=A[t.dataset.a];if(f)f(t,e)});
+document.addEventListener('input',e=>{const t=e.target,c=t.dataset.c;if(!c)return;
+  if(c==='foodq'||c==='desc'||c==='swapq'||c==='libq'){UI[{foodq:'foodQ',desc:'desc',swapq:'swapQ',libq:'libQ'}[c]]=t.value;const pos=t.selectionStart,id=t.id;c==='swapq'||c==='libq'?renderSheet():render();const n=document.getElementById(id);if(n){n.focus();try{n.setSelectionRange(pos,pos)}catch(_){}}}
+  if(c==='dbg'&&UI.sheet){UI.sheet.g=+t.value||0;const v=t.value;renderSheet();const n=$('#dbG');if(n){n.focus();n.value=v}return}
+  if(c==='setkg'||c==='setreps'){const s=S.active.list[+t.dataset.x].sets[+t.dataset.i];s[c==='setkg'?'kg':'reps']=t.value;save()}
+  if(c==='phlook'){UI.phLook[t.dataset.k]=t.value===''?null:+t.value;render();return}
+  if(c==='phx'){UI.phX=+t.value;const imgs=document.querySelectorAll('.compare img');if(imgs[1])imgs[1].style.clipPath=`inset(0 ${100-UI.phX}% 0 0)`;const ln=document.querySelector('.compare>div');if(ln)ln.style.left=UI.phX+'%'}});
+document.addEventListener('change',e=>{const t=e.target,c=t.dataset.c;if(!c)return;
+  if(c==='setnum'){S.profile[t.dataset.f]=+t.value;save();render()}
+  if(c==='swapKeep'){UI.swapKeep=t.checked;renderSheet();return}
+  if(c==='lowEffort'){S.profile.lowEffort=t.checked;save();render()}
+  if(c==='restTimer'){S.profile.restTimer=t.checked;if(!t.checked){UI.timerEnd=0;renderTimer()}save();render()}
+  if(c==='lgset'){UI.sheet.e.ex[t.dataset.id][+t.dataset.i][+t.dataset.k]=+t.value||0;save();return}
+  if(c==='lgdate'&&t.value){if(t.value>TODAY){t.value=UI.sheet.e.d;return toast('That date is in the future')}UI.sheet.e.d=t.value;sortLog();save();render();return}
+  if(c==='fx'){const v=parseFloat(t.value);if(v>0){S.food[UI.sheet.d][UI.sheet.i].x=Math.round(v*100)/100;save();render()}return}
+  if(c==='remind'&&t.value){S.gtg.remind[t.dataset.f]=t.value;save();render()}
+  if(c==='dayname'){const p=S.program.find(p=>p.id===UI.sheet.day);p.name=t.value.trim()||p.name;save();render()}
+  if(c==='ph'&&t.files[0]){UI.ph[t.dataset.k]=URL.createObjectURL(t.files[0]);render()}
+  if(c==='importfile'&&t.files[0]){t.files[0].text().then(txt=>{let j;try{j=JSON.parse(txt)}catch(_){return toast('That file is not a backup')}
+    const d=j&&j.data;if(!d||!d.profile||!Array.isArray(d.weights)||!Array.isArray(d.log))return toast('That file is not a Tally backup');
+    UI.sheet.pending=d;UI.sheet.pendingWhen=j.saved?fmtDate(ymd(new Date(j.saved))):'?';renderSheet()})}});
+// Day rollover: the app may stay open past midnight, so re-check the date when it comes back and every minute.
+function checkDay(){const d=ymd(new Date());if(d!==TODAY){TODAY=d;if(!document.querySelector('input:focus'))render()}}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkDay()});addEventListener('focus',checkDay);setInterval(checkDay,60000);
+try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(_){}
+</script>
+<script src="native.js?v=5"></script>
+<script src="ui-core.js?v=3"></script>
+<script src="ui-more.js?v=3"></script>
