@@ -1,15 +1,25 @@
 /* Tally offline cache (web / iPhone only; the Android app doesn't use it).
    Code and the page: network first, so updates arrive as soon as there's a connection; the cached copy when offline.
-   Pictures and fonts: from the cache once seen. Other sites (AI, food databases) are never cached. */
-const V='tally-202611151320';
-const CORE=['./','index.html','app.css','poses.js','tips.js','native.js','ui-core.js','ui-more.js','manifest.webmanifest',
-  'icon.svg','icon-180.png','icon-192.png','icon-512.png',
+   Every copy is stored under its plain path (no ?v=), so offline always gets the newest code you've had, not the first.
+   Pictures and fonts: from the cache once seen; the exercise drawings are fetched in the background after install,
+   so they work offline even before you've opened each one. Other sites (AI, food databases) are never cached.
+   deploy-web.sh gives V a new name on every publish. */
+const V='tally-202611161314';
+const CORE=['index.html','app.css','poses.js','tips.js','native.js','ui-core.js','ui-more.js','manifest.webmanifest',
+  'icon.svg','icon-180.png','icon-192.png','icon-512.png','icon-mask-512.png',
   'fonts/BigShouldersDisplay-latin.woff2','fonts/BigShouldersDisplay-latin-ext.woff2','fonts/Manrope-latin.woff2','fonts/Manrope-latin-ext.woff2'];
-self.addEventListener('install',e=>{e.waitUntil(caches.open(V).then(c=>c.addAll(CORE)).then(()=>self.skipWaiting()))});
-self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==V).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});
+const MEDIA=['ill/0004_0.svg','ill/0004_1.svg','ill/0018_0.svg','ill/0018_1.svg','ill/0023_0.svg','ill/0023_1.svg','ill/0024_0.svg','ill/0024_1.svg','ill/0025_0.svg','ill/0025_1.svg','ill/0026_0.svg','ill/0026_1.svg','ill/0029_0.svg','ill/0029_1.svg','ill/0031_0.svg','ill/0031_1.svg','ill/0032_0.svg','ill/0032_1.svg','ill/0035_0.svg','ill/0035_1.svg','ill/0042_0.svg','ill/0042_1.svg','ill/0043_0.svg','ill/0043_1.svg','ill/0048_0.svg','ill/0048_1.svg','ill/0049_0.svg','ill/0049_1.svg','ill/0054_0.svg','ill/0054_1.svg','ill/0055_0.svg','ill/0055_1.svg','ill/0056_0.svg','ill/0056_1.svg','ill/0066_0.svg','ill/0066_1.svg','ill/0072_0.svg','ill/0072_1.svg','ill/0075_0.svg','ill/0075_1.svg','ill/0077_0.svg','ill/0077_1.svg','ill/0080_0.svg','ill/0080_1.svg','ill/0081_0.svg','ill/0081_1.svg','ill/0086_0.svg','ill/0086_1.svg','ill/0087_0.svg','ill/0087_1.svg','ill/0090_0.svg','ill/0090_1.svg','ill/0092_0.svg','ill/0092_1.svg','ill/0093_0.svg','ill/0093_1.svg','ill/0096_0.svg','ill/0096_1.svg','ill/0109_0.svg','ill/0109_1.svg','ill/0113_0.svg','ill/0113_1.svg','ill/0117_0.svg','ill/0117_1.svg','ill/0118_0.svg','ill/0118_1.svg','ill/0119_0.svg','ill/0119_1.svg','ill/0122_0.svg','ill/0122_1.svg','ill/0123_0.svg','ill/0123_1.svg','ill/0127_0.svg','ill/0127_1.svg','ill/0132_0.svg','ill/0132_1.svg','ill/0142_0.svg','ill/0142_1.svg','ill/0145_0.svg','ill/0145_1.svg','ill/0162_0.svg','ill/0162_1.svg','ill/0166_0.svg','ill/0166_1.svg','ill/0170_0.svg','ill/0170_1.svg','ill/0175_0.svg','ill/0175_1.svg','ill/0188_0.svg','ill/0188_1.svg','ill/0193_0.svg','ill/0193_1.svg','ill/0204_0.svg','ill/0204_1.svg','ill/0206_0.svg','ill/0206_1.svg','ill/0212_0.svg','ill/0212_1.svg','ill/0214_0.svg','ill/0214_1.svg','ill/0224_0.svg','ill/0224_1.svg','ill/0226_0.svg','ill/0226_1.svg','ill/0227_0.svg','ill/0227_1.svg','ill/0239_0.svg','ill/0239_1.svg','ill/0245_0.svg','ill/0245_1.svg','ill/0247_0.svg','ill/0247_1.svg','ill/0279_0.svg','ill/0279_1.svg','ill/0282_0.svg','ill/0282_1.svg','ill/0286_0.svg','ill/0286_1.svg','ill/0288_0.svg','ill/0288_1.svg','ill/0291_0.svg','ill/0291_1.svg','gif/archer.webp','gif/bladv.webp','gif/blfull.webp','gif/blstr.webp','gif/bltuck.webp','gif/burpee.webp','gif/dflag.webp','gif/fladv.webp','gif/flag.webp','gif/flfull.webp','gif/flone.webp','gif/flstr.webp','gif/fltuck.webp','gif/frog.webp','gif/german.webp','gif/hang.webp','gif/highpull.webp','gif/hkr.webp','gif/hlr.webp','gif/hollow.webp','gif/hsfree.webp','gif/hspu.webp','gif/hspudef.webp','gif/hspufree.webp','gif/hswall.webp','gif/lsit.webp','gif/lunge.webp','gif/mu.webp','gif/oac.webp','gif/pike.webp','gif/pistol.webp','gif/pladv.webp','gif/plank.webp','gif/plfull.webp','gif/pllean.webp','gif/plstr.webp','gif/pltuck.webp','gif/pulltop.webp','gif/pushup1.webp','gif/sbdip.webp','gif/sflag.webp','gif/sideplank.webp','gif/sktc.webp','gif/squat.webp','gif/tflag.webp','gif/ttb.webp','gif/tucklsit.webp','gif/vflag.webp','gif/vsit.webp','gif/wallwalk.webp'];
+const base=new URL('./',self.location).pathname;
+// One key per file: the path without its query, and the folder itself counts as index.html.
+const keyOf=u=>{const p=new URL(u,self.location).pathname;return new Request(p.endsWith('/')?p+'index.html':p)};
+// One file failing (a flaky connection) must not throw away the whole install: each file is cached on its own,
+// and anything missed is cached the first time it is used.
+self.addEventListener('install',e=>{e.waitUntil(caches.open(V).then(c=>Promise.all(CORE.map(f=>fetch(f,{cache:'reload'}).then(r=>{if(r.ok)return c.put(keyOf(f),r)}).catch(()=>{})))).then(()=>self.skipWaiting()))});
+self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==V).map(k=>caches.delete(k)))).then(()=>self.clients.claim())
+  .then(()=>caches.open(V)).then(c=>Promise.all(MEDIA.map(f=>c.match(keyOf(f)).then(m=>m||fetch(f).then(r=>{if(r.ok)return c.put(keyOf(f),r)}).catch(()=>{}))))))});
 self.addEventListener('fetch',e=>{const r=e.request,u=new URL(r.url);
   if(r.method!=='GET'||u.origin!==location.origin)return;
-  const code=r.mode==='navigate'||/\.(js|css|html|webmanifest)$/.test(u.pathname)||u.pathname.endsWith('/');
-  if(code){e.respondWith(fetch(r).then(res=>{if(res.ok){const cp=res.clone();caches.open(V).then(c=>c.put(r,cp))}return res})
-    .catch(()=>caches.match(r,{ignoreSearch:true}).then(m=>m||caches.match('index.html'))));return}
-  e.respondWith(caches.match(r,{ignoreSearch:true}).then(m=>m||fetch(r).then(res=>{if(res.ok){const cp=res.clone();caches.open(V).then(c=>c.put(r,cp))}return res})))});
+  const k=keyOf(r.url),code=r.mode==='navigate'||/\.(js|css|html|webmanifest)$/.test(u.pathname)||u.pathname.endsWith('/');
+  if(code){e.respondWith(fetch(r).then(res=>{if(res.ok){const cp=res.clone();caches.open(V).then(c=>c.put(k,cp))}return res})
+    .catch(()=>caches.match(k).then(m=>m||(r.mode==='navigate'?caches.match(keyOf(base)):undefined)).then(m=>m||Response.error())));return}
+  e.respondWith(caches.match(k).then(m=>m||fetch(r).then(res=>{if(res.ok){const cp=res.clone();caches.open(V).then(c=>c.put(k,cp))}return res})))});
