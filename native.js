@@ -14,6 +14,8 @@ const gem=()=>{try{return JSON.parse(localStorage.getItem(GK))||{}}catch(_){retu
 const setGem=o=>{try{localStorage.setItem(GK,JSON.stringify({...gem(),...o}))}catch(_){}};
 const nset=()=>{const d={on:true,weigh:'07:30',gtg:true,timer:true,pills:true,mg:'23:00'};const o={...d,...(S.profile.notif||{})};if(!o.fe)o.fe=o.weigh;return o};
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+// A redraw nobody tapped for waits while you are typing (softRender, ui-more.js).
+const soft=()=>typeof softRender==='function'?softRender():render();
 
 /* ---------- Small helpers ---------- */
 const sz=o=>Math.round(o);
@@ -31,6 +33,7 @@ const setAic=o=>{try{localStorage.setItem(AIC,JSON.stringify({...aic(),...o}))}c
 const GEM_SEED=['gemini-flash-latest','gemini-flash-lite-latest','gemini-2.5-flash','gemini-2.5-flash-lite','gemini-2.0-flash','gemini-2.0-flash-lite'];
 const withT=(p,ms)=>Promise.race([p,new Promise((_,rej)=>setTimeout(()=>rej(Object.assign(new Error('timeout'),{status:408})),ms))]);
 const aiErr=(msg,status)=>Object.assign(new Error(msg),{status});
+const tfetch=(u,o,ms=20000)=>withT(fetch(u,o),ms);
 // Newest Flash first, then Flash-Lite. Pro models are left out: the free tier gives them no quota.
 function gemRank(names){const sc=n=>{const v=(n.match(/gemini-(\d+(?:\.\d+)?)/)||[])[1],ver=v?parseFloat(v):/latest/.test(n)?90:0;
     return (/flash-lite/.test(n)?1000:0)-ver*10+(/preview|exp/.test(n)?5:0)+n.length*.01};
@@ -48,7 +51,7 @@ const imgsOf=b64=>[].concat(b64||[]).filter(Boolean);
 async function gemCall(model,prompt,b64,key){const parts=[{text:prompt}];imgsOf(b64).forEach(d=>parts.push({inline_data:{mime_type:'image/jpeg',data:d}}));
   const r=await withT(fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,{method:'POST',
     headers:{'Content-Type':'application/json','x-goog-api-key':key},body:JSON.stringify({contents:[{parts}],generationConfig:{responseMimeType:'application/json',temperature:0.2}})}),40000);
-  const j=await r.json().catch(()=>({}));if(!r.ok)throw aiErr((j.error&&j.error.message)||('Gemini error '+r.status),r.status);
+  const j=await withT(r.json(),30000).catch(()=>({}));if(!r.ok)throw aiErr((j.error&&j.error.message)||('Gemini error '+r.status),r.status);
   const t=j.candidates&&j.candidates[0]&&j.candidates[0].content&&(j.candidates[0].content.parts||[]).map(p=>p.text||'').join('');
   if(!t)throw aiErr('empty answer',204);return t}
 // OpenRouter: free models change often, so the list is read live. 'openrouter/free' is their own router across them.
@@ -59,7 +62,7 @@ async function orModels(vision){const c=aic(),k=vision?'orv':'ort';if(c[k]&&c[k]
 async function orCall(model,prompt,b64,key){
   const r=await withT(fetch('https://openrouter.ai/api/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+key},
     body:JSON.stringify({model,temperature:0.2,messages:[{role:'user',content:imgsOf(b64).length?[{type:'text',text:prompt},...imgsOf(b64).map(d=>({type:'image_url',image_url:{url:'data:image/jpeg;base64,'+d}}))]:prompt}]})}),60000);
-  const j=await r.json().catch(()=>({}));if(!r.ok||j.error)throw aiErr((j.error&&j.error.message)||('OpenRouter error '+r.status),(j.error&&+j.error.code)||r.status);
+  const j=await withT(r.json(),30000).catch(()=>({}));if(!r.ok||j.error)throw aiErr((j.error&&j.error.message)||('OpenRouter error '+r.status),(j.error&&+j.error.code)||r.status);
   const t=j.choices&&j.choices[0]&&j.choices[0].message&&j.choices[0].message.content;if(!t)throw aiErr('empty answer',204);
   return typeof t==='string'?t:t.map(p=>p.text||'').join('')}
 function parseJSON(t){t=String(t).replace(/```(?:json)?/g,'').trim();try{return JSON.parse(t)}catch(_){}
@@ -111,25 +114,44 @@ const where=()=>S.profile.loc==='XX'?(S.profile.region||'their country'):S.profi
 const SNAP_MAX=4;
 const snapsB64=()=>{const s=UI.snaps||[];return s.length?s.map(x=>x.b64):null};
 function clearSnaps(){(UI.snaps||[]).forEach(x=>URL.revokeObjectURL(x.url));UI.snaps=[]}
-function addSnap(url,b64){UI.snaps=[...(UI.snaps||[]),{url,b64}];while(UI.snaps.length>SNAP_MAX)URL.revokeObjectURL(UI.snaps.shift().url)}
+function addSnap(url,b64){UI.aiTok=(UI.aiTok||0)+1;UI.snaps=[...(UI.snaps||[]),{url,b64}];while(UI.snaps.length>SNAP_MAX)URL.revokeObjectURL(UI.snaps.shift().url)}
 window.addSnap=addSnap;
 const aiMem=()=>(Array.isArray(S.aiMem)?S.aiMem:[]).filter(Boolean);
+/* Learning from your corrections: when you change a kcal number the AI gave (before adding the meal, or later in its edit
+   sheet), the pair "AI said / it was" is kept (S.aiFix, newest 40). The closest ones go into every later prompt, with the
+   direction the AI has been off on average, so the same mistake is not made twice. */
+const aiFixes=()=>(Array.isArray(S.aiFix)?S.aiFix:[]).filter(f=>f&&f.n&&f.a>0&&f.u>0);
+function aiLearn(n,g,a,u){a=Math.round(+a);u=Math.round(+u);n=String(n||'').trim().slice(0,80);const r=u/a;
+  // Small nudges (under 8% or 15 kcal) and wild ones (a different food, really) teach nothing.
+  if(!n||!(a>0)||!(u>0)||Math.abs(r-1)<0.08||Math.abs(u-a)<15||r<0.3||r>3)return false;
+  const key=n.toLowerCase();S.aiFix=[...aiFixes().filter(f=>f.n.toLowerCase()!==key),{n,g:g>0?Math.round(g):null,a,u,d:TODAY}].slice(-40);return true}
+// Set back to the AI's own number: that correction was wrong, forget it.
+function aiForget(n){const key=String(n||'').trim().slice(0,80).toLowerCase(),a=aiFixes(),b=a.filter(f=>f.n.toLowerCase()!==key);if(b.length===a.length)return false;S.aiFix=b;return true}
+// The overall lean needs 5 recent corrections (last 90 days), so a few old ones do not tilt every meal.
+function aiBias(){const old=addDays(TODAY,-90),f=aiFixes().filter(x=>!x.d||x.d>=old).slice(-20);if(f.length<5)return null;const ls=f.map(x=>Math.log(x.a/x.u)),m=ls.reduce((a,b)=>a+b,0)/ls.length,same=ls.filter(x=>(x>0)===(m>0)).length/ls.length;
+  const pct=Math.round((Math.exp(m)-1)*100);return Math.abs(pct)>=6&&same>=0.7?{pct,n:f.length}:null}
+function aiLearned(desc){const all=aiFixes();if(!all.length)return '';const wsOf=s=>String(s||'').toLowerCase().split(/[^a-zà-ÿ]+/).filter(w=>w.length>2),ws=new Set(wsOf(desc));
+  const pick=all.map((f,i)=>({f,i,s:wsOf(f.n).filter(w=>ws.has(w)).length})).sort((x,y)=>y.s-x.s||y.i-x.i).slice(0,8),b=aiBias();
+  return 'Corrections this user made to your earlier estimates (your number, then the real one). When the same or a similar food comes up, start from their number and scale it to the amount:\n'
+    +pick.map(({f})=>`- ${f.n}${f.g?' ('+f.g+' g)':''}: you said ${f.a} kcal, it was ${f.u} kcal`).join('\n')
+    +(b?`\nAcross their last ${b.n} corrections your estimates were about ${Math.abs(b.pct)}% too ${b.pct>0?'high':'low'}. Lean that way when you are unsure, without applying it blindly.`:'')}
 // fix = {prev:[items], msgs:[what the user said was wrong, oldest first]} when re-estimating after feedback.
 async function foodAI(desc,b64,fix){const mem=aiMem(),fx=fix&&fix.prev&&fix.msgs&&fix.msgs.length;
   const j=await gemini(`You estimate nutrition for a meal logged by ${who()} who lives in ${where()}. The numbers go into a calorie log for a body recomposition, so accuracy matters more than speed.
 Meal description: "${desc||'(see photo)'}".
 ${imgsOf(b64).length>1?imgsOf(b64).length+' photos of the same meal are attached (different angles, parts of the meal, or a label). Combine them into one estimate and do not count the same food twice. Judge portion sizes from plates, cutlery and hands.':b64?'A photo of the meal is attached. Judge portion sizes from plates, cutlery and hands.':''}
 ${mem.length?'Facts this user told you earlier about how they eat (trust them):\n'+mem.map(m=>'- '+m).join('\n'):''}
+${aiLearned(desc)}
 Method: 1) name each component, 2) estimate its cooked weight in grams, 3) apply typical kcal and macros per 100 g for that food as cooked, 4) add cooking oil, butter, sauces and dressings as their own items when they are likely. Be realistic about home-cooking oil; don't lowball. Typical portions unless the text says otherwise.
 ${fx?`Your previous estimate was:\n${fix.prev.map(i=>`- ${i.n}: ${i.g?Math.round(i.g)+' g, ':''}${Math.round(i.k)} kcal, ${Math.round(i.pr)} g protein`).join('\n')}
 The user says it is wrong:\n${fix.msgs.map(m=>'- "'+m+'"').join('\n')}
 Redo the whole estimate using this. Facts the user states (amounts, ingredients, how it was cooked, brand) override your guesses. Keep items they did not question unless their correction affects them.`:''}
 Return JSON only: {"items":[{"n":"short name with amount, e.g. 'Couscous with lamb, 1 plate'","g":grams,"k":kcal,"pr":protein_g,"c":carbs_g,"f":fat_g,"fi":fiber_g,"why":"max 12 words: the amount you assumed and the main assumption"}],"note":"one short sentence on what was hardest to judge${fx?', or what you changed':''}"}`,b64);
   // Models sometimes answer "350 kcal" as text, or leave kcal empty but give the macros. Read both; drop anything absurd.
-  const num=v=>{if(typeof v==='number')return v;const m=String(v==null?'':v).replace(',','.').match(/\d+(?:\.\d+)?/);return m?+m[0]:NaN};
+  const num=v=>{if(typeof v==='number')return v;const m=String(v==null?'':v).replace(/(\d),(?=\d{3}(?:\D|$))/g,'$1').replace(',','.').match(/\d+(?:\.\d+)?/);return m?+m[0]:NaN};
   const items=(Array.isArray(j.items)?j.items:[]).filter(i=>i&&i.n).map(i=>{const pr=Math.max(0,num(i.pr)||0),c=Math.max(0,num(i.c)||0),f=Math.max(0,num(i.f)||0);
-      let k=num(i.k);if(!(k>=0))k=pr||c||f?pr*4+c*4+f*9:NaN;return {n:String(i.n).slice(0,80),g:num(i.g)>0?num(i.g):null,k,pr,c,f,fi:Math.max(0,num(i.fi)||0),why:String(i.why||'').slice(0,120)}})
-    .filter(i=>isFinite(i.k)&&i.k>=0&&i.k<=5000);
+      let k=num(i.k);if(!(k>0)&&(pr||c||f))k=pr*4+c*4+f*9;else if(!(k>=0))k=NaN;return {n:String(i.n).slice(0,80),g:num(i.g)>0?num(i.g):null,k,pr,c,f,fi:Math.max(0,num(i.fi)||0),why:String(i.why||'').slice(0,120)}})
+    .filter(i=>isFinite(i.k)&&i.k>=0&&i.k<=5000).map(i=>({...i,k0:i.k}));   // k0 = the AI's own number, to learn from if you change it
   if(!items.length)throw new Error('Could not read any food from that');
   return {items,note:j.note||''}}
 async function bodyAI(b64){const w=(typeof trendNow==='function'&&trendNow())||S.profile.startKg||null;
@@ -142,8 +164,9 @@ Return JSON only: {"est":number,"lo":number,"hi":number,"note":"one or two short
 /* ---------- Open Food Facts ---------- */
 // A value the label doesn't give stays unknown (null), shown as "?", instead of pretending it is 0.
 const nn=v=>v==null||v===''||isNaN(+v)?null:+v;
-async function offLookup(code){const r=await fetch(`https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(code)}.json?fields=product_name,brands,nutriments,serving_quantity,quantity`);
-  const j=await r.json();if(!j||j.status!==1||!j.product)throw new Error('Not in Open Food Facts. Use Type it or a custom item.');
+async function offLookup(code){const r=await tfetch(`https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(code)}.json?fields=product_name,brands,nutriments,serving_quantity,quantity`);
+  if(!r.ok&&r.status!==404)throw new Error('Open Food Facts is not answering right now ('+r.status+'). Try again, or type the numbers in.');
+  const j=await withT(r.json(),15000).catch(()=>null);if(!j||j.status!==1||!j.product)throw new Error('Not in Open Food Facts. Use Type it or a custom item.');
   const p=j.product,n=p.nutriments||{},kcal=n['energy-kcal_100g']??(n['energy_100g']?n['energy_100g']/4.184:null);
   if(kcal==null)throw new Error('That product has no nutrition data. Use a custom item.');
   return {n:[p.brands&&p.brands.split(',')[0],p.product_name].filter(Boolean).join(' ')||code,k:+kcal,pr:nn(n.proteins_100g),c:nn(n.carbohydrates_100g),f:nn(n.fat_100g),fi:nn(n.fiber_100g),serv:+p.serving_quantity||100}}
@@ -153,13 +176,13 @@ async function scanImage(file){if(!('BarcodeDetector' in window))throw new Error
 
 /* ---------- Food database search ---------- */
 const fdcKey=()=>gem().fdc||'DEMO_KEY';
-async function fdcSearch(q){const r=await fetch(`https://api.nal.usda.gov/fdc/v1/foods/search?query=${encodeURIComponent(q)}&dataType=${encodeURIComponent('Foundation,SR Legacy')}&pageSize=8&api_key=${encodeURIComponent(fdcKey())}`);
+async function fdcSearch(q){const r=await tfetch(`https://api.nal.usda.gov/fdc/v1/foods/search?query=${encodeURIComponent(q)}&dataType=${encodeURIComponent('Foundation,SR Legacy')}&pageSize=8&api_key=${encodeURIComponent(fdcKey())}`);
   if(r.status===429)throw new Error('USDA limit reached for now. Add your own free key in Settings.');if(!r.ok)throw new Error('USDA search failed ('+r.status+')');const j=await r.json();
   return (j.foods||[]).map(f=>{const n={};(f.foodNutrients||[]).forEach(x=>{n[x.nutrientNumber]=x.value});
     const k=n['208']??n['957']??n['958']??(n['268']!=null?n['268']/4.184:null);if(k==null)return null;
     const name=f.description.charAt(0)+f.description.slice(1).toLowerCase();
     return {n:name,k:+k,pr:nn(n['203']),c:nn(n['205']),f:nn(n['204']),fi:nn(n['291']),src:'usda'}}).filter(Boolean)}
-async function offSearch(q){const r=await fetch(`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=8&fields=product_name,brands,nutriments,serving_quantity`);
+async function offSearch(q){const r=await tfetch(`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=8&fields=product_name,brands,nutriments,serving_quantity`);
   if(!r.ok)throw new Error('Open Food Facts search failed');const j=await r.json();
   return (j.products||[]).map(p=>{const n=p.nutriments||{},k=n['energy-kcal_100g']??(n['energy_100g']?n['energy_100g']/4.184:null);if(k==null||!p.product_name)return null;
     return {n:[p.brands&&p.brands.split(',')[0],p.product_name].filter(Boolean).join(' '),k:+k,pr:nn(n.proteins_100g),c:nn(n.carbohydrates_100g),f:nn(n.fat_100g),fi:nn(n.fiber_100g),serv:+p.serving_quantity||null,src:'off'}}).filter(Boolean)}
@@ -189,8 +212,8 @@ X.snapCard=()=>{const g=gem(),st=UI.ai||{},ps=UI.snaps||[],n=ps.length,ph=n>0,mo
        <label class="row small" style="gap:8px;cursor:pointer"><input id="aiMemOn" type="checkbox" style="width:18px;height:18px"><span class="grow">Remember this for future meals <span class="muted">(only for facts that are always true)</span></span></label>
        ${st.fixErr?`<p class="small" style="color:var(--bad)">${esc(st.fixErr)}</p>`:''}
        <button class="btn block" data-a="aifix" ${st.fixing?'disabled':''}>${st.fixing?'Re-estimating…':'Re-estimate with this'}</button></div></details>
-     <p class="small muted">Or fix any kcal yourself; protein, carbs and fat scale with it. Next time it's one tap under Again.</p>
-     <button class="btn primary block" data-a="aiadd">Add ${st.items.length} items · ${fmt(st.items.reduce((a,i)=>a+i.k,0))} kcal</button></div>`:''}`};
+     <p class="small muted">Or fix any kcal yourself: protein, carbs and fat scale with it, and the AI learns from your number for next time.</p>
+     <button class="btn primary block" id="aiAddB" data-a="aiadd" ${st.fixing?'disabled':''}>Add ${st.items.length} item${st.items.length>1?'s':''} · ${fmt(st.items.reduce((a,i)=>a+i.k,0))} kcal</button></div>`:''}`};
 X.offCard=()=>{const o=UI.off||{},nScan=S.myFoods.filter(f=>f.code).length;return `<div class="card flat stack" style="padding:12px"><p class="small"><b>Packaged food</b> <span class="small muted">barcode · Open Food Facts + your own scans</span></p>
    ${NATIVE&&BS?`<button class="btn primary block" data-a="livescan" ${o.busy?'disabled':''}>${o.busy?'Looking up…':'Scan a barcode'}</button>`
     :'BarcodeDetector' in window?`<label class="btn sm" style="text-align:center">Scan from a photo<input type="file" accept="image/*" capture="environment" data-c="offscan" hidden></label>`:''}
@@ -212,7 +235,7 @@ function rememberScan(code,p,g){const per100={k:p.k,pr:p.pr,c:p.c,f:p.f,fi:p.fi|
   if(i>=0)S.myFoods[i]=item;else S.myFoods.push(item)}
 async function offFind(code){const mine=mineByCode(code);if(mine){UI.off={code,p:mine};render();return}
   UI.off={code,busy:true};render();
-  try{UI.off={code,p:await offLookup(code)}}catch(e){const off=!navigator.onLine||e instanceof TypeError||/fetch|network|load failed/i.test(e.message||'');
+  try{UI.off={code,p:await offLookup(code)}}catch(e){const off=!navigator.onLine||e instanceof TypeError||/fetch|network|load failed|timeout/i.test(e.message||'');
     UI.off={code,err:off?'No connection.':e.message,manual:off||/Not in Open Food Facts|no nutrition/i.test(e.message),offline:off}}render()}
 X.bfAI=()=>{const g=gem(),a=S.bfAI&&Object.entries(S.bfAI).sort().pop(),st=UI.bfai||{};
   return `<div class="card flat stack" style="padding:12px"><p class="small"><b>Photo estimate (AI)</b></p>
@@ -264,18 +287,18 @@ function impApply(d,list){const E=S.impEdit||{},D=S.impDel||{},seen={};
 function impPrune(){const old=addDays(TODAY,-10);['impEdit','impDel'].forEach(k=>{const o=S[k];if(!o)return;Object.keys(o).forEach(id=>{const d=o[id]&&o[id].d||o[id];if(typeof d==='string'&&d<old)delete o[id]})})}
 async function mfpDiary(quiet){const u=S.profile.mfpUser;if(!NATIVE||!u)return;UI.mfpd={busy:true};if(!quiet)render();
   try{const days=[0,1,2].map(i=>addDays(TODAY,-i));let n=0;impPrune();
-    for(const d of days){const r=await fetch(`https://www.myfitnesspal.com/api/services/diary/read_diary?entry_date=${d}&fields=all&types=food_entry&username=${encodeURIComponent(u)}`,{headers:{Accept:'application/json'}});
+    for(const d of days){const r=await tfetch(`https://www.myfitnesspal.com/api/services/diary/read_diary?entry_date=${d}&fields=all&types=food_entry&username=${encodeURIComponent(u)}`,{headers:{Accept:'application/json'}},25000);
       if(r.status===401||r.status===403)throw new Error('MyFitnessPal says this diary is private. Set Diary Sharing to Public, then Sync.');
       if(r.status===404)throw new Error('No MyFitnessPal user called "'+u+'". Check the username.');
       if(!r.ok)throw new Error('MyFitnessPal answered '+r.status+'. Try again later.');
-      const j=await r.json().catch(()=>null);if(!j)throw new Error('MyFitnessPal sent a web page instead of diary data (probably a bot check). Try again later.');
+      const j=await withT(r.json(),20000).catch(()=>null);if(!j)throw new Error('MyFitnessPal sent a web page instead of diary data (probably a bot check). Try again later.');
       const items=(Array.isArray(j)?j:j.items||j.data||j.entries||[]).filter(x=>x&&(!x.type||x.type==='food_entry'));
       const add=items.map(mfpItem).filter(Boolean);
       // A day with only 0-kcal entries (water, black coffee) is fine. Only a diary we can't read at all is an error.
       if(items.length&&!add.length&&!items.some(x=>x.nutritional_contents||x.nutrition))throw new Error('Got the diary but could not read it. Send this to Claude: '+JSON.stringify(items[0]).slice(0,240));
-      const own=(S.food[d]||[]).filter(x=>x.src!=='mfp');S.food[d]=own.concat(impApply(d,add.map(({meal,...a})=>({...a,g:'mfp-'+d+'-'+meal}))));n+=add.length;save()}
-    UI.mfpd={};UI.mfpdAt=nowHM();save();render();if(!quiet)toast(n?n+' entries from MyFitnessPal':'Connected. Nothing in the diary for the last 3 days yet.');return true}
-  catch(e){UI.mfpd={err:e.message||String(e)};save();render();return false}}
+      const own=(S.food[d]||[]).filter(x=>x.src!=='mfp'&&!(x.src==='hc'&&/ · MFP$/.test(x.n||'')));S.food[d]=own.concat(impApply(d,add.map(({meal,...a})=>({...a,g:'mfp-'+d+'-'+meal}))));n+=add.length;save()}
+    UI.mfpd={};UI.mfpdAt=nowHM();save();quiet?soft():render();if(!quiet)toast(n?n+' entries from MyFitnessPal':'Connected. Nothing in the diary for the last 3 days yet.');return true}
+  catch(e){UI.mfpd={err:e.message==='timeout'?'MyFitnessPal did not answer. Try again in a bit.':e.message||String(e)};save();quiet?soft():render();return false}}
 /* ---------- Settings pages (the frame is in ui-more.js) ---------- */
 // The key test: both services at once, a hard 30 s limit each, and a status line per service that updates while it runs.
 const short=m=>String(m||'').replace(/\s+/g,' ').slice(0,120);
@@ -320,6 +343,10 @@ X.setAI=()=>{const g=gem(),T=UI.gemT||{},c=aic(),q=(S.aiq||[]).length;return `
    <div class="card stack" style="gap:8px"><p class="small"><b>What the AI remembers about your food</b></p>
     ${aiMem().length?`<div class="list">${aiMem().map((m,i)=>`<div class="li"><span class="grow small">${esc(m)}</span><button class="icon-btn s" data-a="aimemdel" data-i="${i}" aria-label="Forget this">${I.x}</button></div>`).join('')}</div>`
      :'<p class="small muted">Nothing yet. After an estimate, open "Looks wrong? Tell the AI why" and tick "Remember this" to add a fact here.</p>'}</div>
+   ${(()=>{const fx=aiFixes(),b=aiBias();return `<div class="card stack" style="gap:8px"><p class="small"><b>Learned from your corrections</b></p>
+    ${fx.length?`<div class="list">${fx.map((f,i)=>({f,i})).slice(-12).reverse().map(({f,i})=>`<div class="li"><span class="grow small">${esc(f.n)}<br><span class="tiny muted">AI said ${fmt(f.a)} · you set ${fmt(f.u)} kcal · ${fmtDate(f.d)}</span></span><button class="icon-btn s" data-a="aifixdel" data-i="${i}" aria-label="Forget this correction">${I.x}</button></div>`).join('')}</div>
+      <p class="tiny muted">${fx.length>12?fx.length+' kept, newest shown. ':''}${b?`Across your last ${b.n} corrections it ran about ${Math.abs(b.pct)}% too ${b.pct>0?'high':'low'}. It is told that with every new estimate.`:'The closest ones are sent along with every new estimate.'}</p>`
+     :'<p class="small muted">Nothing yet. When you change a kcal number the AI gave you, the pair is kept here and sent along with later estimates, so it stops making the same mistake.</p>'}</div>`})()}
    ${q||UI.aiUsed||(c.gm&&c.gm.length)?`<p class="tiny muted">${c.gm&&c.gm.length?c.gm.length+' Gemini models available to your key. ':''}${UI.aiUsed?'Last answer: '+esc(UI.aiUsed)+'. ':''}${q?q+' meal'+(q>1?'s':'')+' waiting for an estimate.':''}</p>`:''}
    <details class="card"><summary class="small" style="font-weight:700">Advanced</summary><div class="stack" style="margin-top:10px">
     <div class="field"><label class="label" for="gemModel">Preferred Gemini model</label><input id="gemModel" value="${esc(g.model||'')}" placeholder="automatic: newest free Flash" autocapitalize="off" spellcheck="false" data-c="gemmodel"></div>
@@ -328,7 +355,7 @@ X.setAI=()=>{const g=gem(),T=UI.gemT||{},c=aic(),q=(S.aiq||[]).length;return `
 X.setNotif=()=>{if(!NATIVE)return '<p class="small muted">Notifications come with the Android app.</p>';const n=nset(),off=!n.on;
   const sw=(k,l,sub)=>`<label class="srow"><span class="grow"><b>${l}</b>${sub?`<br><span class="small muted">${sub}</span>`:''}</span><input type="checkbox" class="switch" ${n[k]?'checked':''} data-c="ntog" data-k="${k}"></label>`;
   const tm=(l,sub,v,attrs)=>`<label class="srow${off?' dim':''}"><span class="grow"><b>${l}</b><br><span class="small muted">${sub}</span></span><input type="time" value="${v}" ${attrs}></label>`;
-  return `<div class="card slist">${sw('on','All notifications')}</div>
+  return `${UI.nPerm&&UI.nPerm!=='granted'?'<div class="note"><p><b class="hi">Notifications are blocked for Tally.</b> Nothing below can reach you until you allow them: Android Settings → Apps → Tally → Notifications.</p></div>':''}<div class="card slist">${sw('on','All notifications')}</div>
    <p class="label" style="margin-top:4px">Reminders</p>
    <div class="card slist">
     ${tm('Morning weigh-in','Skipped once you have logged today',n.weigh,'data-c="nweigh"')}
@@ -353,23 +380,28 @@ async function nInit(){if(!NATIVE||!LN)return;try{
     else if(ex.kind==='gtg'&&a.actionId==='tap'){UI.tab='today';UI.sheet={kind:'repset'};render()}
     // Typed straight into the notification: saved as a fasted morning weigh-in for the day it was sent.
     else if(ex.kind==='weigh'&&a.actionId==='kg'){const v=parseFloat(String(a.inputValue||'').replace(',','.')),d=ex.d||TODAY;
-      if(v>40&&v<150){const old=putWeight(d,Math.round(v*10)/10,nowHM(),true);render();weightToast(d,old,'Weigh-in saved: '+v+' kg')}else{UI.tab='today';UI.sheet={kind:'weight'};render();toast('Could not read "'+(a.inputValue||'')+'". Type it here.')}}
+      if(v>40&&v<150){const t=nowHM(),morn=d===TODAY&&isMorning(t),f=S.weights.find(w=>w.d===d&&!w.sample&&w.fasted);
+        // Answered late (not this morning): it's kept out of the trend, and never replaces a fasted weigh-in.
+        if(!morn&&f){render();toast("Kept this morning's "+f.kg+" kg")}else{const old=putWeight(d,Math.round(v*10)/10,t,morn);render();weightToast(d,old,morn?'Weigh-in saved: '+v+' kg':'Saved '+v+' kg, kept out of the trend (not a morning weigh-in)')}}else{UI.tab='today';UI.sheet={kind:'weight'};render();toast('Could not read "'+(a.inputValue||'')+'". Type it here.')}}
     else if(ex.kind==='weigh'){UI.tab='today';UI.sheet={kind:'weight'};render();setTimeout(()=>{const i=document.getElementById('wIn3');if(i)i.focus()},300)}});
-  const p=await LN.checkPermissions();if(p.display!=='granted')await LN.requestPermissions();nSync()}catch(e){console.warn(e)}}
+  let p=await LN.checkPermissions();if(p.display!=='granted')p=await LN.requestPermissions();UI.nPerm=p.display;nSync()}catch(e){console.warn(e)}}
 let syncT;function nSyncSoon(){clearTimeout(syncT);syncT=setTimeout(nSync,800)}
 async function nSync(){if(!NATIVE||!LN)return;try{
+  try{UI.nPerm=(await LN.checkPermissions()).display}catch(_){}
   const pend=await LN.getPending();const mine=pend.notifications.filter(n=>n.id>=ID.weigh&&n.id<ID.timer||n.id>=ID.gtg);if(mine.length)await LN.cancel({notifications:mine.map(n=>({id:n.id}))});
   const n=nset();if(!n.on)return;const out=[],now=Date.now(),at=(d,mins)=>{const x=parse(d);x.setMinutes(mins);return x};
   [0,1].forEach(off=>{const d=addDays(TODAY,off),t=at(d,toMin(n.weigh));if(t>now&&!S.weights.some(w=>w.d===d&&!w.sample))
     out.push({id:ID.weigh+off,title:'Morning weigh-in',body:'After the toilet, before food or water. Pull down to type it here.',channelId:'remind',actionTypeId:'weigh',schedule:{at:t,allowWhileIdle:true},extra:{kind:'weigh',d}})});
   // Rep reminder: ONE pending at a time. The next comes `every` minutes after the last logged set.
-  if(n.gtg&&S.gtg.on.length){const names=S.gtg.on.map(id=>{const m=MOVES.find(x=>x.id===id);return m?`${setSize(id)} ${m.n.toLowerCase()}`:''}).filter(Boolean).join(', ');
+  if(n.gtg&&S.gtg.on.length){const names=S.gtg.on.map(id=>{const m=MOVES.find(x=>x.id===id);return m?moveTxtS(id,setSize(id)):''}).filter(Boolean).join(', ');
+    const step=Math.max(15,+S.gtg.remind.every||90);
     const add=(id,t)=>out.push({id,title:'Rep set',body:names,channelId:'quiet',actionTypeId:'gtg',schedule:{at:t,allowWhileIdle:true},extra:{kind:'gtg'}});
     // A set that's already due (you opened the app late, or ignored the last one) still gets a reminder: the next
     // step of `every` minutes from when it came due, never a burst of old ones.
     // Tomorrow's first one is only queued once today's are over, so there is never more than one waiting.
-    const nx=gtgNext();let today=false;if(nx!=null){let m=nx;while(at(TODAY,m)<=now)m+=S.gtg.remind.every;if(m<=toMin(S.gtg.remind.end)){add(ID.gtg,at(TODAY,m));today=true}}
-    if(!today)add(ID.gtg+1,at(addDays(TODAY,1),toMin(S.gtg.remind.start)))}
+    const nx=gtgNext();let today=false;if(nx!=null){let m=nx;while(at(TODAY,m)<=now)m+=step;if(m<=toMin(S.gtg.remind.end)){add(ID.gtg,at(TODAY,m));today=true}}
+    // Tomorrow's first is always queued too, so an ignored reminder never stops the next day's.
+    add(ID.gtg+1,at(addDays(TODAY,1),toMin(S.gtg.remind.start)))}
   if(n.pills)[['fe',n.fe,'Iron (fer)','Take it now with water, on an empty stomach. Coffee, tea, milk and whey at least an hour later.'],['mg',n.mg,'Magnesium','Take it before you sleep.']].filter(([k])=>hasSupp(k)).forEach(([k,tm,title,body])=>
     [0,1].forEach(off=>{const d=addDays(TODAY,off),t=at(d,toMin(tm));if(t>now&&!(S.supps[d]||{})[k])out.push({id:ID[k]+off,title,body,channelId:'remind',actionTypeId:'pill',schedule:{at:t,allowWhileIdle:true},extra:{kind:'pill',k,d}})}));
   if(out.length)await LN.schedule({notifications:out})}catch(e){console.warn(e)}}
@@ -381,7 +413,7 @@ async function hcRead(quiet){if(!NATIVE||!HP)return;try{
   const end=parse(addDays(TODAY,1)),start=parse(addDays(TODAY,-6));
   const r=await HP.queryAggregated({startDate:start.toISOString(),endDate:end.toISOString(),dataType:'steps',bucket:'day'});
   (r.aggregatedData||[]).forEach(b=>{const d=ymd(new Date(b.startDate)),v=Math.round(+b.value||0);if(v>(S.steps[d]||0)||d===TODAY)S.steps[d]=v});
-  UI.hcAt=nowHM();save();render()}catch(e){if(!quiet)toast('Could not read steps: '+(e.message||e))}}
+  UI.hcAt=nowHM();save();quiet?soft():render()}catch(e){if(!quiet)toast('Could not read steps: '+(e.message||e))}}
 // The plugin's Android side returns permissions as {READ_STEPS:true}, its docs say [{READ_STEPS:true}]. Accept both.
 const granted=(r,k)=>{const p=r&&r.permissions;return Array.isArray(p)?p.some(x=>x&&x[k]):!!(p&&p[k])};
 async function hcAsk(perms){const av=await HP.isHealthAvailable();if(!av.available){toast('Install Health Connect from the Play Store first');try{await HP.showHealthConnectInPlayStore()}catch(_){}return null}
@@ -396,15 +428,15 @@ async function mfpOn(){if(!HP)return;try{const r=await hcAsk(['READ_NUTRITION'])
 const MEAL={breakfast:'Breakfast',lunch:'Lunch',dinner:'Dinner',snack:'Snack'};
 async function mfpSync(quiet){if(!NATIVE||!HP||!S.profile.mfp)return;try{
   const days=[0,1,2].map(i=>addDays(TODAY,-i));
-  const r=await HP.queryNutrition({startDate:parse(days[2]).toISOString(),endDate:parse(addDays(TODAY,1)).toISOString()});
+  const r=await HP.queryNutrition({startDate:new Date(+parse(days[2])+dayEnd()*6e4).toISOString(),endDate:new Date(+parse(addDays(TODAY,1))+dayEnd()*6e4).toISOString()});
   // With the public diary also connected, MyFitnessPal's own entries come from the diary: taking them here too would count them twice.
   const diary=!!S.profile.mfpUser;impPrune();
-  const by={};(r.entries||[]).forEach(e=>{if(/recomp/i.test(e.sourceBundleId||''))return;if(diary&&/myfitnesspal/i.test(e.sourceBundleId||''))return;const d=ymd(new Date(e.startDate));(by[d]=by[d]||[]).push(e)});
+  const by={};(r.entries||[]).forEach(e=>{if(/recomp/i.test(e.sourceBundleId||''))return;if(diary&&/myfitnesspal/i.test(e.sourceBundleId||''))return;const d=dayOf(Date.parse(e.startDate));(by[d]=by[d]||[]).push(e)});
   let n=0;days.forEach(d=>{const own=(S.food[d]||[]).filter(x=>x.src!=='hc');
     const add=(by[d]||[]).filter(e=>e.energyKcal>0).map(e=>{const m=e.macros||{},mfp=/myfitnesspal/i.test(e.sourceBundleId||'');
       return {n:(e.name||MEAL[e.mealType]||'Food')+(mfp?' · MFP':''),k:Math.round(e.energyKcal),pr:Math.round(m.proteinG||0),c:Math.round(m.carbohydratesG||0),f:Math.round(m.fatG||0),fi:Math.round(m.fiberG||0),x:1,src:'hc',hid:e.id,iid:e.id?'hc:'+e.id:undefined,g:'hc-'+d+'-'+(e.mealType||'x')}});
     if(add.length||own.length!==(S.food[d]||[]).length){S.food[d]=own.concat(impApply(d,add));n+=add.length}});
-  UI.mfpAt=nowHM();save();render();if(!quiet)toast(n?n+' entries from MyFitnessPal':'Connected. Nothing logged in MyFitnessPal for the last 3 days yet.')}
+  UI.mfpAt=nowHM();save();quiet?soft():render();if(!quiet)toast(n?n+' entries from MyFitnessPal':'Connected. Nothing logged in MyFitnessPal for the last 3 days yet.')}
   catch(e){if(!quiet)toast('MyFitnessPal sync: '+(e.message||e))}}
 
 /* ---------- Backup through the share sheet ---------- */
@@ -430,7 +462,9 @@ X.autoBkNote=()=>NATIVE?`<p class="small muted">Auto backup: every week to <b>Do
 const hasPH=()=>typeof PH!=='undefined';
 function queueMeal(desc,b64){const id=Date.now().toString(36),q=parseMeal(desc||''),sum=f=>Math.round(q.reduce((a,o)=>a+(o.f[f]||0)*o.x,0));
   pushFood({n:(desc||'Photo meal').slice(0,70),k:sum('k'),pr:sum('pr'),c:sum('c'),f:sum('f'),fi:sum('fi'),x:1,src:'ai',pend:id,g:id});
-  (S.aiq=S.aiq||[]).push({id,d:foodDayNow(),desc:desc||'',img:!!b64,at:Date.now(),tries:0});if(b64&&hasPH())PH.put('q:'+id,b64).catch(()=>{});save();queueKick(60000)}
+  const qi={id,d:foodDayNow(),desc:desc||'',img:!!b64&&hasPH(),at:Date.now(),tries:0};(S.aiq=S.aiq||[]).push(qi);
+  // If the photo can't be stored, the meal waits on its words alone (or asks for numbers) instead of sending "(see photo)" with no photo.
+  if(qi.img)PH.put('q:'+id,b64).catch(()=>{qi.img=false;save()});save();queueKick(60000)}
 let qT=null,qBusy=false;
 function queueKick(ms){clearTimeout(qT);if((S.aiq||[]).length)qT=setTimeout(queueRun,ms)}
 async function queueRun(){if(qBusy||!(S.aiq||[]).length)return;
@@ -438,18 +472,21 @@ async function queueRun(){if(qBusy||!(S.aiq||[]).length)return;
   // Always read the day fresh: a MyFitnessPal sync may have replaced S.food[day] while the AI was thinking.
   const unpend=q=>(S.food[q.d]||[]).forEach(x=>{if(x.pend===q.id){delete x.pend;if(!(x.k>0))x.nonum=1}});
   // Key removed since the meal was queued: keep the quick-match numbers and say so, instead of "Estimating" forever.
-  if(!hasAI()){const qs=[...S.aiq];qs.forEach(q=>{unpend(q);drop(q)});save();render();toast(qs.length+' meal'+(qs.length>1?'s':'')+' kept with rough numbers: no AI key. Tap to fix them.');return}
-  qBusy=true;
+  if(!hasAI()){const qs=[...S.aiq];qs.forEach(q=>{unpend(q);drop(q)});save();soft();toast(qs.length+' meal'+(qs.length>1?'s':'')+' kept with rough numbers: no AI key. Tap to fix them.');return}
+  qBusy=true;try{
   for(const q of [...S.aiq]){
     if(!(S.food[q.d]||[]).some(e=>e.pend===q.id)){drop(q);save();continue}                       // you deleted it
     try{const b64=q.img&&hasPH()?await PH.get('q:'+q.id):null,r=await foodAI(q.desc,b64||undefined),ents=S.food[q.d]||[],i=ents.findIndex(e=>e.pend===q.id);if(i<0){drop(q);save();continue}
-      const old=ents[i];ents.splice(i,1,...r.items.map(it=>({n:it.n,k:Math.round(it.k),pr:Math.round(it.pr),c:Math.round(it.c),f:Math.round(it.f),fi:Math.round(it.fi||0),x:old.x||1,src:'ai',g:old.g,t:old.t,...(it.g?{pg:it.g}:{})})));
-      drop(q);save();render();toast('Estimate ready: '+fmt(r.items.reduce((a,it)=>a+it.k,0))+' kcal')}
+      const old=ents[i];ents.splice(i,1,...r.items.map(it=>({n:it.n,k:Math.round(it.k),pr:Math.round(it.pr),c:Math.round(it.c),f:Math.round(it.f),fi:Math.round(it.fi||0),x:old.x||1,src:'ai',g:old.g,t:old.t,ak:Math.round(it.k),...(it.g?{pg:it.g}:{})})));
+      // The edit sheet open on the waiting entry follows it to the estimate instead of closing under your finger.
+      if(UI.sheet&&UI.sheet.kind==='fedit'&&UI.sheet.e===old)UI.sheet.e=ents[i];
+      drop(q);save();soft();toast('Estimate ready: '+fmt(r.items.reduce((a,it)=>a+it.k,0))+' kcal')}
     catch(e){if(!e.offline)q.tries++;q.err=e.quota?'no free AI quota left today':e.offline?'no connection':e.retry?'the AI is busy':short(e.message);
-      if(e.quota||Date.now()-q.at>2*36e5||q.tries>=6||(!e.retry&&q.tries>=3)){unpend(q);drop(q);render();toast('No estimate for "'+(q.desc||'photo meal').slice(0,30)+'" ('+q.err+'). Tap it in Food to set the numbers.')}
+      if(e.quota||Date.now()-q.at>2*36e5||q.tries>=6||(!e.retry&&q.tries>=3)){unpend(q);drop(q);soft();toast('No estimate for "'+(q.desc||'photo meal').slice(0,30)+'" ('+q.err+'). Tap it in Food to set the numbers.')}
       save();if(e.offline||e.quota)break}}
-  qBusy=false;render();if((S.aiq||[]).length)queueKick([60,120,300,600,900][Math.min(4,Math.min(...S.aiq.map(q=>q.tries)))]*1000)}
+  }finally{qBusy=false}soft();if((S.aiq||[]).length)queueKick([60,120,300,600,900][Math.min(4,Math.min(...S.aiq.map(q=>q.tries)))]*1000)}
 // Pending entry: why it is still waiting, for the edit sheet.
+X.aiLearn=aiLearn;X.aiForget=aiForget;
 X.pendInfo=id=>{const q=(S.aiq||[]).find(x=>x.id===id);return q?{tries:q.tries,err:q.err||'',at:q.at}:null};
 // Stop waiting: keep the numbers it has now.
 X.unpend=(d,e)=>{const q=(S.aiq||[]).find(x=>x.id===e.pend);delete e.pend;if(!(e.k>0))e.nonum=1;if(q){S.aiq=S.aiq.filter(x=>x!==q);if(hasPH())PH.del('q:'+q.id).catch(()=>{})}save()};
@@ -462,23 +499,30 @@ X.savePhoto=async(id,blob)=>{if(!NATIVE||!FS)return;try{const b64=await new Prom
 
 /* ---------- Actions ---------- */
 Object.assign(A,{
- aifood:async()=>{const d=UI.desc.trim(),ph=snapsB64();if(!d&&!ph)return toast('Add a photo or a few words first');UI.ai={busy:true};render();
-   try{UI.ai=await foodAI(d,ph);queueKick(2000)}
-   catch(e){if(e.retry){queueMeal(d,ph);UI.ai={};UI.desc='';clearSnaps();if(UI.sheet&&UI.sheet.kind==='describe')UI.sheet=null;render();
+ aifood:async()=>{const d=UI.desc.trim(),ph=snapsB64();if(!d&&!ph)return toast('Add a photo or a few words first');const tok=UI.aiTok=(UI.aiTok||0)+1;UI.ai={busy:true};render();
+   try{const r=await foodAI(d,ph);if(tok!==UI.aiTok)return;UI.ai=r;queueKick(2000)}
+   catch(e){if(tok!==UI.aiTok)return;if(e.retry){queueMeal(d,ph);UI.ai={};UI.desc='';clearSnaps();if(UI.sheet&&UI.sheet.kind==='describe')UI.sheet=null;render();
        toast(e.offline?'No connection. Saved: it gets estimated when you are back online.':'The AI is busy. Saved: the numbers fill in by themselves shortly.');return}
      UI.ai={err:e.message,quota:!!e.quota}}render()},
  // Feedback on an estimate: the AI redoes it with what you said, and can remember lasting facts for next time.
  aifix:async()=>{const st=UI.ai;if(!st||!st.items)return;const el=$('#aiFix'),msg=((el&&el.value)||'').trim().slice(0,300),keep=!!($('#aiMemOn')||{}).checked;
-   if(!msg)return toast('Say what looks wrong first');const ph=snapsB64(),fixes=[...(st.fixes||[]),msg];
+   if(!msg)return toast('Say what looks wrong first');if(st.fixing)return;const ph=snapsB64(),fixes=[...(st.fixes||[]),msg],tok=UI.aiTok=(UI.aiTok||0)+1;
    if(keep){S.aiMem=[...aiMem().filter(m=>m!==msg),msg].slice(-25);save()}
    UI.ai={...st,fixing:true,fixErr:null};render();
-   try{const r=await foodAI(UI.desc.trim(),ph,{prev:st.items,msgs:fixes});UI.ai={...r,fixes};toast(keep?'Re-estimated · remembered for next time':'Re-estimated')}
-   catch(e){UI.ai={...st,fixing:false,fixErr:e.retry?'The AI is busy right now. Try again in a minute, or fix the kcal yourself.':e.message}}render()},
+   // A late answer is dropped if the meal was added, cleared or its photos changed meanwhile.
+   try{const r=await foodAI(UI.desc.trim(),ph,{prev:st.items,msgs:fixes});if(tok!==UI.aiTok)return;UI.ai={...r,fixes};toast(keep?'Re-estimated · remembered for next time':'Re-estimated')}
+   catch(e){if(tok!==UI.aiTok)return;UI.ai={...st,fixing:false,fixErr:e.retry?'The AI is busy right now. Try again in a minute, or fix the kcal yourself.':e.message}}render()},
+ aifixdel:t=>{const fx=aiFixes();fx.splice(+t.dataset.i,1);S.aiFix=fx;save();renderSheet()},
  aimemdel:t=>{const m=aiMem();m.splice(+t.dataset.i,1);S.aiMem=m;save();renderSheet()},
  snapclear:()=>{clearSnaps();render()},
- snaprm:t=>{const s=UI.snaps||[],p=s.splice(+t.dataset.i,1)[0];if(p)URL.revokeObjectURL(p.url);render()},
+ snaprm:t=>{const s=UI.snaps||[],p=s.splice(+t.dataset.i,1)[0];if(p)URL.revokeObjectURL(p.url);UI.aiTok=(UI.aiTok||0)+1;if(UI.ai&&(UI.ai.busy||UI.ai.items))UI.ai={};render()},
  aidel:t=>{UI.ai.items.splice(+t.dataset.i,1);if(!UI.ai.items.length)UI.ai={};render()},
- aiadd:t=>{const tot=UI.ai.items.reduce((a,i)=>a+i.k,0);if(bigAsk(tot,()=>A.aiadd({dataset:{ok:1}}),t))return;const g=Date.now().toString(36);UI.ai.items.forEach(i=>pushFood({n:i.n,k:Math.round(i.k),pr:Math.round(i.pr),c:Math.round(i.c),f:Math.round(i.f),fi:Math.round(i.fi||0),x:1,src:'ai',g,...(i.g?{pg:i.g}:{})}));const n=UI.ai.items.length;UI.ai={};UI.desc='';clearSnaps();save();render();toast(n+' items added')},
+ aiadd:t=>{const st=UI.ai;if(!st||!st.items||st.fixing)return;const tot=st.items.reduce((a,i)=>a+i.k,0);if(bigAsk(tot,()=>A.aiadd({dataset:{ok:1}}),t))return;const g=Date.now().toString(36),d=foodDayNow(),fx0=Array.isArray(S.aiFix)?S.aiFix.slice():S.aiFix;let learned=0;
+   // A kcal you changed before adding is a correction: the AI keeps it for next time. ak = the AI's own number, for fixes made later.
+   st.items.forEach(i=>{if(i.k0>0&&Math.round(i.k)!==Math.round(i.k0)&&aiLearn(i.n,i.g,i.k0,i.k))learned++;
+     pushFood({n:i.n,k:Math.round(i.k),pr:Math.round(i.pr),c:Math.round(i.c),f:Math.round(i.f),fi:Math.round(i.fi||0),x:1,src:'ai',g,ak:Math.round(i.k0>0?i.k0:i.k),...(i.g?{pg:i.g}:{})})});
+   const n=st.items.length;UI.aiTok=(UI.aiTok||0)+1;UI.ai={};UI.desc='';clearSnaps();save();render();
+   toast(n+' item'+(n>1?'s':'')+' added'+(learned?' · the AI will remember your fix':''),()=>{S.food[d]=(S.food[d]||[]).filter(e=>e.g!==g);if(learned)S.aiFix=fx0;save();render()})},
  offgo:()=>{const c=($('#offCode').value||'').replace(/\D/g,'');if(c.length<8)return toast('Enter the full barcode');offFind(c)},
  offadd:t=>{const p=UI.off.p,g=parseFloat($('#offG').value);if(!(g>0))return toast('Enter grams');const x=g/100;if(bigAsk(p.k*x,()=>A.offadd({dataset:{ok:1}}),t))return;rememberScan(UI.off.code,p,g);
    pushFood({n:p.n+' ('+g+' g)',k:p.k*x,pr:p.pr*x,c:p.c*x,f:p.f*x,fi:(p.fi||0)*x,x:1,src:'off'});UI.off={};save();render();toast('Added')},
@@ -495,7 +539,7 @@ Object.assign(A,{
    pushFood({n:p.n+' ('+g+' g)',k:p.k*x,pr:p.pr*x,c:p.c*x,f:p.f*x,fi:0,x:1,src:'off'});UI.off={};save();render();toast('Saved. Next scan of it is instant.')},
  mfpon:mfpOn, mfpsync:()=>mfpSync(false), mfpoff:()=>{S.profile.mfp=false;save();render();toast('MyFitnessPal import off. Already imported entries stay.')},
  gemtest:aiTest,
- ntest:async()=>{try{await LN.schedule({notifications:[{id:99,title:'Tally',body:'Notifications work.',channelId:'remind',schedule:{at:new Date(Date.now()+2000)}}]});toast('Sending in 2 s')}catch(e){toast(e.message)}}
+ ntest:async()=>{try{const p=await LN.checkPermissions();UI.nPerm=p.display;if(p.display!=='granted'){renderSheet();return toast('Notifications are blocked for Tally in Android Settings')}await LN.schedule({notifications:[{id:99,title:'Tally',body:'Notifications work.',channelId:'remind',schedule:{at:new Date(Date.now()+2000)}}]});toast('Sending in 2 s')}catch(e){toast(e.message)}}
 });
 document.addEventListener('change',async e=>{const t=e.target,c=t.dataset.c;if(!c)return;
   if(c==='gemkey'){setGem({key:t.value.trim()});setAic({cool:{},gm:null});UI.gemT=null;renderSheet()}
@@ -513,7 +557,9 @@ document.addEventListener('change',async e=>{const t=e.target,c=t.dataset.c;if(!
   if(c==='offscan'&&t.files[0]){try{offFind(await scanImage(t.files[0]))}catch(er){UI.off={err:er.message};render()}}});
 // An item the AI gave 0 kcal can still be set: there is just nothing to scale the macros from.
 document.addEventListener('input',e=>{const t=e.target;if(t.dataset.c!=='aik')return;const i=UI.ai.items[+t.dataset.i],v=+t.value;if(!i||!(v>=0)||t.value==='')return;
-  if(i.k>0){const k=v/i.k;i.pr*=k;i.c*=k;i.f*=k;i.fi=(i.fi||0)*k}i.k=v});
+  // Scaled from the AI's own numbers, so passing through 0 while typing does not wipe the macros.
+  if(!i.b)i.b={k:i.k,pr:i.pr,c:i.c,f:i.f,fi:i.fi||0};if(i.b.k>0){const k=v/i.b.k;i.pr=i.b.pr*k;i.c=i.b.c*k;i.f=i.b.f*k;i.fi=i.b.fi*k}i.k=v;
+  const b=document.getElementById('aiAddB'),n=UI.ai.items.length;if(b)b.textContent='Add '+n+' item'+(n>1?'s':'')+' · '+fmt(UI.ai.items.reduce((a,x)=>a+x.k,0))+' kcal'});
 
 /* ---------- Wire up ---------- */
 window.NX=X;X.onSave=nSyncSoon;

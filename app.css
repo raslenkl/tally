@@ -548,3 +548,19 @@ h2.long{font-size:22px} h2.xlong{font-size:19px;line-height:1.05}
 .cd.pre{opacity:.32}
 /* The full-screen skill map sits above sheets; a skill opened from it must show on top. */
 body.mapon .sheet-bg{z-index:48}
+
+/* Ghost race: last time against today, set by set */
+.grace{background:var(--bg);border:1px solid var(--line);border-radius:16px;padding:10px 12px;display:flex;flex-direction:column;gap:7px}
+.glanes{display:grid;grid-template-columns:auto repeat(var(--n),minmax(0,1fr));gap:5px;align-items:center;font-variant-numeric:tabular-nums}
+.glanes .who{font-size:9.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding-right:5px;white-space:nowrap}
+.glanes .c{font-size:12.5px;font-weight:700;text-align:center;padding:5px 2px;border-radius:9px;background:var(--raise);color:var(--muted);white-space:nowrap;overflow:hidden}
+.glanes .c i{font-style:normal;opacity:.55;margin:0 1px}
+.glanes .c b{margin-left:3px;font-size:9.5px;vertical-align:1px}
+.glanes .c.up{color:var(--mint);background:color-mix(in srgb,var(--mint) 12%,transparent)}
+.glanes .c.eq{color:var(--hi)}
+.glanes .c.dn{color:var(--muted)}
+.glanes .c.now{background:none;box-shadow:inset 0 0 0 1px var(--line2);color:var(--hi);font-size:10px;letter-spacing:.08em;text-transform:uppercase}
+.glanes .c.off{background:none;color:var(--faint)}
+.glanes.tight .c{font-size:10.5px;padding:5px 0}
+.glanes.tight .c b{display:none}
+.gl{font-weight:800}.gl.up{color:var(--mint)}.gl.eq{color:var(--hi)}.gl.dn{color:var(--warn)}
