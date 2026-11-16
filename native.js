@@ -247,7 +247,7 @@ X.bfAI=()=>{const g=gem(),a=S.bfAI&&Object.entries(S.bfAI).sort().pop(),st=UI.bf
    :`<p class="small muted">Add an AI key in Settings to get an estimate from a photo.</p>`}</div>`};
 X.bfRun=async b64=>{UI.bfai={busy:true};render();try{const r=await bodyAI(b64);S.bfAI=S.bfAI||{};S.bfAI[TODAY]=r;UI.bfai={};save();toast('Photo estimate: '+Math.round(r.lo)+'–'+Math.round(r.hi)+'%')}
   catch(er){UI.bfai={err:er.offline?'No connection. Try again when you are online.':er.message}}render()};
-X.steps=()=>NATIVE?`<div class="card flat stack" style="padding:12px">${S.profile.hcOn?`<p class="small">Steps come from Health Connect automatically (last read ${UI.hcAt?UI.hcAt:'not yet'}).</p><button class="btn sm" data-a="hcread">Refresh now</button>`
+X.steps=()=>NATIVE?`<div class="card flat stack" style="padding:12px">${S.profile.hcOn?`<p class="small">Steps come from Health Connect automatically (last read ${UI.hcAt?UI.hcAt:'not yet'}).</p>${UI.hcErr?`<p class="tiny muted">Health Connect: ${esc(UI.hcErr)}</p>`:''}<div class="row" style="gap:6px"><button class="btn sm" data-a="hcread">Refresh now</button>${UI.hcErr&&/permission/i.test(UI.hcErr)?`<button class="btn sm" data-a="hcon">Reconnect</button>`:''}</div>`
    :`<p class="small"><b>Samsung Health steps</b></p><p class="small muted">In Samsung Health: Settings → Health Connect → turn on sync for Steps. Then connect here.</p><button class="btn sm primary" data-a="hcon">Connect Health Connect</button>`}</div>`
    :'<p class="small muted">The Android app reads this from Samsung Health automatically.</p>';
 X.gtgNote=()=>NATIVE&&nset().on&&nset().gtg?'The notification has a one-tap "Done" button that logs the set and restarts the clock.':NATIVE?'Rep reminders are off in Settings.':'The Android app sends these as quiet notifications.';
@@ -256,7 +256,7 @@ X.gtgNote=()=>NATIVE&&nset().on&&nset().gtg?'The notification has a one-tap "Don
 const mfpCardHC=()=>{if(!NATIVE)return `<div class="card flat stack" style="padding:12px"><p class="small"><b>MyFitnessPal</b> <span class="small muted">Android app only</span></p><p class="small muted">The Android app can pull in everything you log in MyFitnessPal, through Health Connect.</p></div>`;
   const on=S.profile.mfp,n=(S.food[TODAY]||[]).filter(e=>e.src==='hc').length;
   return `<div class="card flat stack" style="padding:12px"><p class="small"><b>MyFitnessPal</b> <span class="small muted">through Health Connect</span></p>
-   ${on?`<p class="small">${n?`<b>${n}</b> entries from MyFitnessPal today.`:'Nothing from MyFitnessPal today yet.'} Last sync ${UI.mfpAt||'not yet'}. It syncs each time you open the app.</p>
+   ${on?`<p class="small">${n?`<b>${n}</b> entries from MyFitnessPal today.`:'Nothing from MyFitnessPal today yet.'} Last sync ${UI.mfpAt||'not yet'}. It syncs each time you open the app.</p>${UI.mfpErr?`<p class="tiny muted">Last try failed: ${esc(UI.mfpErr)}</p>`:''}
      <div class="row"><button class="btn sm primary" data-a="mfpsync">Sync now</button><button class="btn sm ghost" data-a="mfpoff">Turn off</button></div>
      ${S.profile.mfpUser?'<p class="small muted">The public diary is connected too, so MyFitnessPal entries come from there (no double counting).</p>':''}<p class="small muted">Log in MyFitnessPal and the meals show up here with their calories and macros. Edits and deletions in MyFitnessPal carry over for the last 3 days, and changes you make here are kept. Nothing appears? In MyFitnessPal check that Health Connect sync is on and includes Nutrition.</p>`
    :`<p class="small muted">Use MyFitnessPal's scanner and food database, and have the meals land here automatically. In MyFitnessPal: Menu → Apps &amp; Devices (or Settings → Sync) → Health Connect → allow it to write <b>Nutrition</b>. Then connect here.</p>
@@ -376,7 +376,7 @@ async function nInit(){if(!NATIVE||!LN)return;try{
     {id:'weigh',actions:[{id:'kg',title:'Log weight',input:true,inputButtonTitle:'Save',inputPlaceholder:'kg, e.g. 74.6'}]}]});
   LN.addListener('localNotificationActionPerformed',a=>{const ex=a.notification&&a.notification.extra||{};
     if(ex.kind==='gtg'&&a.actionId==='done'){const g=gtgDay(TODAY);S.gtg.on.forEach(id=>{(g[id]=g[id]||[]).push(setSize(id))});gtgMark();save();render();toast('Set logged. Next reminder in '+everyTxt(S.gtg.remind.every))}
-    else if(ex.kind==='pill'){const d=ex.d||TODAY;if(a.actionId==='took'){(S.supps[d]=S.supps[d]||{})[ex.k]=true;save();toast((ex.k==='fe'?'Iron':'Magnesium')+' ticked')}UI.tab='today';render()}
+    else if(ex.kind==='pill'){const d=ex.d||TODAY;if(a.actionId==='took'){const sp=S.supps[d]=S.supps[d]||{};sp[ex.k]=true;if(ex.k==='fe'&&d===TODAY)sp.feAt=nowMinD();save();toast((ex.k==='fe'?'Iron':'Magnesium')+' ticked')}UI.tab='today';render()}
     else if(ex.kind==='gtg'&&a.actionId==='tap'){UI.tab='today';UI.sheet={kind:'repset'};render()}
     // Typed straight into the notification: saved as a fasted morning weigh-in for the day it was sent.
     else if(ex.kind==='weigh'&&a.actionId==='kg'){const v=parseFloat(String(a.inputValue||'').replace(',','.')),d=ex.d||TODAY;
@@ -409,11 +409,23 @@ let lastTimer=0;setInterval(async()=>{if(!NATIVE||!LN)return;const te=UI.timerEn
   try{await LN.cancel({notifications:[{id:ID.timer}]});const n=nset();if(te>Date.now()+3000&&n.on&&n.timer)await LN.schedule({notifications:[{id:ID.timer,title:'Rest done',body:'Next set.',channelId:'timer',schedule:{at:new Date(te),allowWhileIdle:true}}]})}catch(e){}},1000);
 
 /* ---------- Health Connect steps ---------- */
-async function hcRead(quiet){if(!NATIVE||!HP)return;try{
+// Two ways in: Health Connect's daily totals (de-duplicated across phone + watch), and, when that call fails
+// (it does on some Health Connect / Samsung versions), the raw step records summed per day here.
+// The raw path also respects "Your day ends at". Per day it takes the source with the most steps, so a phone
+// and a watch counting the same walk aren't added together.
+async function hcSteps(start,end){
+  try{const r=await HP.queryAggregated({startDate:start.toISOString(),endDate:end.toISOString(),dataType:'steps',bucket:'day'});
+    // The plugin answers an empty list, not an error, when the Steps permission was taken away.
+    const a=r.aggregatedData||[];if(!a.length)throw new Error('Steps permission is off. Tap Connect again or allow it in Health Connect.');
+    const o={};a.forEach(b=>{o[ymd(new Date(b.startDate))]=Math.round(+b.value||0)});UI.hcErr=null;return o}
+  catch(e1){const r=await HP.queryRecords({startDate:new Date(+start+dayEnd()*6e4).toISOString(),endDate:new Date(Math.min(Date.now(),+end+dayEnd()*6e4)).toISOString(),dataType:'steps'});
+    const by={};(r.records||[]).forEach(x=>{const d=dayOf(Date.parse(x.startDate)),s=x.sourceBundleId||'?';(by[d]=by[d]||{})[s]=(by[d][s]||0)+(+x.value||0)});
+    const o={};Object.keys(by).forEach(d=>{o[d]=Math.round(Math.max(...Object.values(by[d])))});UI.hcErr='daily totals failed, read raw records ('+String(e1.message||e1).slice(0,80)+')';return o}}
+async function hcRead(quiet){if(!NATIVE||!HP)return;if(document.hidden)return;try{
   const end=parse(addDays(TODAY,1)),start=parse(addDays(TODAY,-6));
-  const r=await HP.queryAggregated({startDate:start.toISOString(),endDate:end.toISOString(),dataType:'steps',bucket:'day'});
-  (r.aggregatedData||[]).forEach(b=>{const d=ymd(new Date(b.startDate)),v=Math.round(+b.value||0);if(v>(S.steps[d]||0)||d===TODAY)S.steps[d]=v});
-  UI.hcAt=nowHM();save();quiet?soft():render()}catch(e){if(!quiet)toast('Could not read steps: '+(e.message||e))}}
+  const o=await hcSteps(start,end);
+  Object.keys(o).forEach(d=>{const v=o[d];if(v>(S.steps[d]||0)||d===TODAY)S.steps[d]=v});
+  UI.hcAt=nowHM();save();quiet?soft():render()}catch(e){UI.hcErr=String(e.message||e).slice(0,140);if(!quiet)toast('Could not read steps: '+(e.message||e));else soft()}}
 // The plugin's Android side returns permissions as {READ_STEPS:true}, its docs say [{READ_STEPS:true}]. Accept both.
 const granted=(r,k)=>{const p=r&&r.permissions;return Array.isArray(p)?p.some(x=>x&&x[k]):!!(p&&p[k])};
 async function hcAsk(perms){const av=await HP.isHealthAvailable();if(!av.available){toast('Install Health Connect from the Play Store first');try{await HP.showHealthConnectInPlayStore()}catch(_){}return null}
@@ -432,12 +444,14 @@ async function mfpSync(quiet){if(!NATIVE||!HP||!S.profile.mfp)return;try{
   // With the public diary also connected, MyFitnessPal's own entries come from the diary: taking them here too would count them twice.
   const diary=!!S.profile.mfpUser;impPrune();
   const by={};(r.entries||[]).forEach(e=>{if(/recomp/i.test(e.sourceBundleId||''))return;if(diary&&/myfitnesspal/i.test(e.sourceBundleId||''))return;const d=dayOf(Date.parse(e.startDate));(by[d]=by[d]||[]).push(e)});
-  let n=0;days.forEach(d=>{const own=(S.food[d]||[]).filter(x=>x.src!=='hc');
+  let n=0;days.forEach(d=>{const hcMfp=!diary&&(by[d]||[]).some(e=>/myfitnesspal/i.test(e.sourceBundleId||''));
+    // Diary disconnected and MFP now comes through Health Connect: the old diary copies of that day go, or it counts twice.
+    const own=(S.food[d]||[]).filter(x=>x.src!=='hc'&&!(hcMfp&&x.src==='mfp'));
     const add=(by[d]||[]).filter(e=>e.energyKcal>0).map(e=>{const m=e.macros||{},mfp=/myfitnesspal/i.test(e.sourceBundleId||'');
       return {n:(e.name||MEAL[e.mealType]||'Food')+(mfp?' · MFP':''),k:Math.round(e.energyKcal),pr:Math.round(m.proteinG||0),c:Math.round(m.carbohydratesG||0),f:Math.round(m.fatG||0),fi:Math.round(m.fiberG||0),x:1,src:'hc',hid:e.id,iid:e.id?'hc:'+e.id:undefined,g:'hc-'+d+'-'+(e.mealType||'x')}});
     if(add.length||own.length!==(S.food[d]||[]).length){S.food[d]=own.concat(impApply(d,add));n+=add.length}});
-  UI.mfpAt=nowHM();save();quiet?soft():render();if(!quiet)toast(n?n+' entries from MyFitnessPal':'Connected. Nothing logged in MyFitnessPal for the last 3 days yet.')}
-  catch(e){if(!quiet)toast('MyFitnessPal sync: '+(e.message||e))}}
+  UI.mfpAt=nowHM();UI.mfpErr=null;save();quiet?soft():render();if(!quiet)toast(n?n+' entries from MyFitnessPal':'Connected. Nothing logged in MyFitnessPal for the last 3 days yet.')}
+  catch(e){UI.mfpErr=String(e.message||e).slice(0,140);if(!quiet)toast('MyFitnessPal sync: '+(e.message||e));else soft()}}
 
 /* ---------- Backup through the share sheet ---------- */
 X.exportFile=async(json,name)=>{try{const r=await FS.writeFile({path:name,data:json,directory:'CACHE',encoding:'utf8'});
@@ -449,7 +463,7 @@ const BK_DIR='RecompCoach';
 async function autoBackup(force){if(!NATIVE||!FS)return;if(!force&&S.autoBk&&diffDays(S.autoBk,TODAY)<7)return;
   try{const json=JSON.stringify({app:'recomp-coach',key:KEY,saved:new Date().toISOString(),data:S},null,1);
     await FS.writeFile({path:BK_DIR+'/recomp-auto-'+TODAY+'.json',data:json,directory:'DOCUMENTS',encoding:'utf8',recursive:true});
-    S.autoBk=TODAY;save();
+    S.autoBk=TODAY;UI.bkErr=null;save();
     try{const r=await FS.readdir({path:BK_DIR,directory:'DOCUMENTS'});const names=(r.files||[]).map(f=>typeof f==='string'?f:f.name).filter(n=>/^recomp-auto-.*\.json$/.test(n)).sort();
       for(const n of names.slice(0,Math.max(0,names.length-4)))await FS.deleteFile({path:BK_DIR+'/'+n,directory:'DOCUMENTS'})}catch(_){}
     if(force)toast('Saved to Documents/'+BK_DIR)}catch(e){UI.bkErr=e.message||String(e);if(force)toast('Auto backup failed: '+UI.bkErr)}}
@@ -460,7 +474,7 @@ X.autoBkNote=()=>NATIVE?`<p class="small muted">Auto backup: every week to <b>Do
    photo database under 'q:'+id. Retries after 1, 2, 5, 10, then 15 minutes, and when the app is opened: 6 tries or 2 hours at most,
    and at once when the AI says the day's free quota is used up. Then the meal keeps its quick-match numbers (or asks for numbers). */
 const hasPH=()=>typeof PH!=='undefined';
-function queueMeal(desc,b64){const id=Date.now().toString(36),q=parseMeal(desc||''),sum=f=>Math.round(q.reduce((a,o)=>a+(o.f[f]||0)*o.x,0));
+function queueMeal(desc,b64){const id=newG(),q=parseMeal(desc||''),sum=f=>Math.round(q.reduce((a,o)=>a+(o.f[f]||0)*o.x,0));
   pushFood({n:(desc||'Photo meal').slice(0,70),k:sum('k'),pr:sum('pr'),c:sum('c'),f:sum('f'),fi:sum('fi'),x:1,src:'ai',pend:id,g:id});
   const qi={id,d:foodDayNow(),desc:desc||'',img:!!b64&&hasPH(),at:Date.now(),tries:0};(S.aiq=S.aiq||[]).push(qi);
   // If the photo can't be stored, the meal waits on its words alone (or asks for numbers) instead of sending "(see photo)" with no photo.
@@ -476,7 +490,10 @@ async function queueRun(){if(qBusy||!(S.aiq||[]).length)return;
   qBusy=true;try{
   for(const q of [...S.aiq]){
     if(!(S.food[q.d]||[]).some(e=>e.pend===q.id)){drop(q);save();continue}                       // you deleted it
-    try{const b64=q.img&&hasPH()?await PH.get('q:'+q.id):null,r=await foodAI(q.desc,b64||undefined),ents=S.food[q.d]||[],i=ents.findIndex(e=>e.pend===q.id);if(i<0){drop(q);save();continue}
+    try{const b64=q.img&&hasPH()?await PH.get('q:'+q.id):null;
+      // A photo-only meal whose photo is gone isn't guessed blind.
+      if(q.img&&!b64&&!(q.desc||'').trim()){unpend(q);drop(q);save();soft();toast('A queued meal photo was lost. Tap the meal to set its numbers.');continue}
+      const r=await foodAI(q.desc,b64||undefined),ents=S.food[q.d]||[],i=ents.findIndex(e=>e.pend===q.id);if(i<0){drop(q);save();continue}
       const old=ents[i];ents.splice(i,1,...r.items.map(it=>({n:it.n,k:Math.round(it.k),pr:Math.round(it.pr),c:Math.round(it.c),f:Math.round(it.f),fi:Math.round(it.fi||0),x:old.x||1,src:'ai',g:old.g,t:old.t,ak:Math.round(it.k),...(it.g?{pg:it.g}:{})})));
       // The edit sheet open on the waiting entry follows it to the estimate instead of closing under your finger.
       if(UI.sheet&&UI.sheet.kind==='fedit'&&UI.sheet.e===old)UI.sheet.e=ents[i];
@@ -517,7 +534,7 @@ Object.assign(A,{
  snapclear:()=>{clearSnaps();render()},
  snaprm:t=>{const s=UI.snaps||[],p=s.splice(+t.dataset.i,1)[0];if(p)URL.revokeObjectURL(p.url);UI.aiTok=(UI.aiTok||0)+1;if(UI.ai&&(UI.ai.busy||UI.ai.items))UI.ai={};render()},
  aidel:t=>{UI.ai.items.splice(+t.dataset.i,1);if(!UI.ai.items.length)UI.ai={};render()},
- aiadd:t=>{const st=UI.ai;if(!st||!st.items||st.fixing)return;const tot=st.items.reduce((a,i)=>a+i.k,0);if(bigAsk(tot,()=>A.aiadd({dataset:{ok:1}}),t))return;const g=Date.now().toString(36),d=foodDayNow(),fx0=Array.isArray(S.aiFix)?S.aiFix.slice():S.aiFix;let learned=0;
+ aiadd:t=>{const st=UI.ai;if(!st||!st.items||st.fixing)return;const tot=st.items.reduce((a,i)=>a+i.k,0);if(bigAsk(tot,()=>A.aiadd({dataset:{ok:1}}),t))return;const g=newG(),d=foodDayNow(),fx0=Array.isArray(S.aiFix)?S.aiFix.slice():S.aiFix;let learned=0;
    // A kcal you changed before adding is a correction: the AI keeps it for next time. ak = the AI's own number, for fixes made later.
    st.items.forEach(i=>{if(i.k0>0&&Math.round(i.k)!==Math.round(i.k0)&&aiLearn(i.n,i.g,i.k0,i.k))learned++;
      pushFood({n:i.n,k:Math.round(i.k),pr:Math.round(i.pr),c:Math.round(i.c),f:Math.round(i.f),fi:Math.round(i.fi||0),x:1,src:'ai',g,ak:Math.round(i.k0>0?i.k0:i.k),...(i.g?{pg:i.g}:{})})});

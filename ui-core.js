@@ -127,7 +127,7 @@ function nowCard(st){
   if(st.k==='reps')return `<div class="now">${lab('Right now · rep set due',1)}<h2>Rep set</h2><p class="ctx"><b>${repSetTxt()}</b>. Easy reps, about half your max.</p>
     <div class="go"><button class="btn cta" data-a="repall">Did it</button><button class="btn" data-a="sheet" data-k="repset">Other numbers</button></div></div>`;
   if(st.k==='refuel')return `<div class="now">${lab('After training',1)}<h2>${st.pleft} g protein to go</h2><p class="ctx">${fmt(Math.max(0,st.left))} kcal left today. Eat within a couple of hours.</p>
-    <div class="go">${sp.wh||!hasSupp('wh')?'':`<button class="btn cta" data-a="supp" data-k="wh">Whey · 24 g</button>`}${againBtns(2,true)}<button class="btn sm ghost" data-a="plus">Log food</button></div></div>`;
+    <div class="go">${sp.wh||!hasSupp('wh')?'':`<button class="btn cta" data-a="supp" data-k="wh">Protein shake</button>`}${againBtns(2,true)}<button class="btn sm ghost" data-a="plus">Log food</button></div></div>`;
   if(st.k==='mag')return `<div class="now">${lab('Right now · before bed',1)}<h2>Magnesium</h2><p class="ctx">Last thing today.</p><div class="go"><button class="btn cta" data-a="supp" data-k="mg">Taken</button></div></div>`;
   if(st.k==='eat')return `<div class="now">${lab('Tonight',1)}<h2>${st.left>0?fmt(st.left)+' kcal left':st.pleft+' g protein to go'}</h2><p class="ctx">${st.left>0?`<b>${st.pleft} g protein</b> still to go.`:'Calories are in. Lean protein closes the gap.'}</p>
     <div class="go">${againBtns(2,st.pleft>=25)}<button class="btn sm ghost" data-a="plus">Log food</button></div></div>`;
@@ -145,7 +145,7 @@ function tickRow(){
    ${T(!!w,'scale',w?w.kg+' kg'+(w.fasted===false?' · not fasted':''):'Weight','data-a="sheet" data-k="weight"')}
    ${hasSupp('fe')?T(!!sp.fe,'pill','Iron','data-a="supp" data-k="fe"'):''}
    ${hasSupp('cr')?T(!!sp.cr,'flask','Creatine','data-a="supp" data-k="cr"'):''}
-   ${hasSupp('wh')?T(!!sp.wh,'cup','Whey','data-a="supp" data-k="wh"'):''}
+   ${hasSupp('wh')?T(!!sp.wh,'cup','Shake','data-a="supp" data-k="wh"'):''}
    ${S.gtg.on.length?T(rounds>=goal,'repeat',`Reps ${rounds}/${goal}`,'data-a="sheet" data-k="repset"',due&&rounds<goal?' due':''):''}
    ${hasSupp('mg')?T(!!sp.mg,'moon','Magnesium','data-a="supp" data-k="mg"'):''}
    ${T(sl!=null,'bed',sl!=null?sl+' h sleep':'Sleep','data-a="sheet" data-k="sleep"')}
@@ -171,7 +171,7 @@ function fuelCard(t,sum){
     <div class="row between"><p class="label">Fuel</p><span class="small"><b class="hi">${fmt(sum.k)}</b> <span class="muted">/ ${fmt(t.k)} kcal</span></span></div>
     <div class="bar"><i style="width:${pct(sum.k,t.k)}%"></i></div>
     <div class="macros">${M('Protein',sum.pr,t.pr,'var(--violet)')}${M('Carbs',sum.c,t.c,'var(--grain)')}${M('Fat',sum.f,t.f,'var(--muted)')}</div>
-    <p class="small muted">${left>=0?`${fmt(left)} kcal left · <b style="color:var(--ink)">${pl} g protein</b> to go.${pl>=20&&!sp.wh&&hasSupp('wh')?' A whey shake covers 24 g.':''}`:`${fmt(-left)} kcal over. The weekly average is what counts.`}</p></button>`}
+    <p class="small muted">${left>=0?`${fmt(left)} kcal left · <b style="color:var(--ink)">${pl} g protein</b> to go.${pl>=20&&!sp.wh&&hasSupp('wh')?' A shake covers '+shakeItem((S.profile.shake||{}).sc||1,false).pr+' g.':''}`:`${fmt(-left)} kcal over. The weekly average is what counts.`}</p></button>`}
 function todayNotes(){
   const o=[],sl=S.sleep[TODAY],m=missedYesterday();
   if(m){const bd=betterDays(m.d,m.p)[0];if(bd)o.push(`<div class="note">${ic('cal')}<div class="grow stack" style="gap:8px"><p><b class="hi">Missed ${esc(m.p.name)} yesterday?</b> Best day to fit it in: <b>${fmtDate(bd.d)}</b>. ${bd.why}</p><div class="row wrap"><button class="btn sm primary" data-a="reschmove" data-from="${m.d}" data-to="${bd.d}" data-id="${m.p.id}" data-past="1">Move it there</button><button class="btn sm" data-a="startday" data-id="${m.p.id}" data-d="${m.d}">I did it · log it</button><button class="btn sm ghost" data-a="reschskip" data-from="${m.d}">Skip it</button></div></div></div>`)}
@@ -198,7 +198,7 @@ function vToday(){
   </div>`}
 
 /* ===================== Food ===================== */
-function feRow({e,i},day){return `<button class="fe${e.pend?' pend':''}" data-a="fedit" data-i="${i}" data-d="${day}" aria-label="Edit ${esc(e.n)}"><span class="grow small"><b class="hi">${esc(e.n.replace(/ · MFP$/,''))}</b>${e.x!==1?` <span class="muted">×${e.x}</span>`:''} ${e.pend?'<span class="tag sig">Estimating</span>':e.nonum?'<span class="tag sig">Needs numbers</span>':SRC_TAG[e.src]?`<span class="tag${e.src==='ai'?' v':''}">${SRC_TAG[e.src]}</span>`:''}<br><span class="muted tiny">${Math.round(e.pr*e.x)} P · ${Math.round(e.c*e.x)} C · ${Math.round(e.f*e.x)} F</span></span><span class="k">${e.pend&&!e.k?'…':fmt(e.k*e.x)}</span></button>`}
+function feRow({e,i},day){return `<button class="fe${e.pend?' pend':''}" data-a="fedit" data-i="${i}" data-d="${day}" aria-label="Edit ${esc(e.n)}"><span class="grow small"><b class="hi">${esc(e.n.replace(/ · MFP$/,''))}</b>${e.x!==1?` <span class="muted">×${e.x}</span>`:''} ${e.pend?'<span class="tag sig">Estimating</span>':e.nonum?'<span class="tag sig">Needs numbers</span>':SRC_TAG[e.src]?`<span class="tag${e.src==='ai'?' v':''}">${SRC_TAG[e.src]}</span>`:''}<br>${e.sub?`<span class="muted tiny">${esc(e.sub)}</span><br>`:''}<span class="muted tiny">${Math.round(e.pr*e.x)} P · ${Math.round(e.c*e.x)} C · ${Math.round(e.f*e.x)} F</span></span><span class="k">${e.pend&&!e.k?'…':fmt(e.k*e.x)}</span></button>`}
 function week7(t){
   const est=estMaint().est,v=[0,1,2,3,4,5,6].map(i=>{const d=addDays(TODAY,i-6);return {d,s:sumFood(d),n:dayFood(d).length,full:d!==TODAY&&fullDay(d,est)}});
   // The average uses fully logged days only (today is still going, half-logged days would pull it down).
@@ -219,7 +219,7 @@ function vEat(){
     return `<section class="mealsec${k===cur?' cur':''}"><div class="meal"><h3>${nm}</h3>${it.length?`<span class="small muted">${fmt(kc)} kcal · ${Math.round(pr)} P</span>`:k===cur?'<span class="tiny sigt">now</span>':''}<span class="grow"></span>${k<4&&it.length?`<button class="icon-btn s" data-a="slotadd" data-k="${k}" aria-label="Add to ${nm.toLowerCase()}">${ic('plus')}</button>`:''}</div>
      ${it.map(o=>feRow(o,day)).join('')}${!it.length&&k<4?`<button class="addrow" data-a="slotadd" data-k="${k}">${ic('plus')}Add ${nm.toLowerCase()}</button>`:''}${k===cur?sug(k):''}</section>`};
   const meals=[0,1,2,3].map(sec).join('')+(gs[4].length?sec(4):'');
-  const yest=isT&&!(S.food[day]||[]).some(e=>!e.auto)?groupsOn(addDays(TODAY,-1)):[];
+  const yest=isT&&!(S.food[day]||[]).some(e=>!e.auto)?copyable(groupsOn(addDays(TODAY,-1))):[];
   const B=(n,v,m,c)=>`<div><div class="row between small"><span>${n}</span><span><b class="hi">${Math.round(v)}</b><span class="muted">/${m}</span></span></div><div class="bar" style="margin-top:4px"><i style="width:${pct(v,m)}%;background:${c}"></i></div></div>`;
   const mfpN=(S.food[TODAY]||[]).filter(e=>e.src==='mfp'||e.src==='hc').length,mfpOn=S.profile.mfpUser||S.profile.mfp;
   return `

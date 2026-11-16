@@ -501,7 +501,8 @@ function targets(){
 }
 const def=id=>{const d=LIB[id]||S.customEx[id];return d?{id,...d}:{id,n:id,g:'curl',m:{},r:[8,12],rest:90,u:'kg'}};
 const primary=d=>Object.entries(d.m).sort((a,b)=>b[1]-a[1])[0]?.[0];
-function lastFor(id){for(let i=S.log.length-1;i>=0;i--){const s=S.log[i].ex[id];if(s&&s.length)return {d:S.log[i].d,sets:s}}return null}
+// While logging a past session, "last time" means the session before that date, not a newer one.
+function lastFor(id,before){if(before===undefined)before=S.active&&S.active.past?S.active.d:null;for(let i=S.log.length-1;i>=0;i--){if(before&&S.log[i].d>=before)continue;const s=S.log[i].ex[id];if(s&&s.length)return {d:S.log[i].d,sets:s}}return null}
 const unitLabel=u=>u==='bw'?'+kg':'kg';
 const stepFor=kg=>kg>=60?5:2.5;
 function suggest(d){
@@ -601,9 +602,10 @@ const HIST_DO={
  // A meal that was still waiting for the AI when it was deleted has lost its place in the queue: it comes back with the numbers it had.
  food(r){const b=S.food[r.d]=S.food[r.d]||[],e=r.e;if(!e||b.includes(e))return false;
    if(e.pend&&!(S.aiq||[]).some(q=>q.id===e.pend)){delete e.pend;if(!(e.k>0))e.nonum=1}
-   b.splice(Math.min(r.i,b.length),0,e);if(e.iid&&S.impDel)delete S.impDel[e.iid];save();render()},
+   b.splice(Math.min(r.i,b.length),0,e);if(e.iid&&S.impDel)delete S.impDel[e.iid];
+   if(e.auto==='wh'){const s=S.supps[r.d]=S.supps[r.d]||{};s.wh=true;if(e.cr&&!s.cr){s.cr=true;s.crBy='wh'}}save();render()},
  log(r){if(!r.e||S.log.includes(r.e))return false;S.log.push(r.e);sortLog();save();render()},
- weight(r){if(!r.w)return false;if(S.weights.some(w=>w.d===r.w.d&&!w.sample&&w!==r.w))return toast('You logged a newer weigh-in for that day. Delete it first to bring this one back.');S.weights=S.weights.filter(w=>w.d!==r.w.d||w.sample);S.weights.push(r.w);S.weights.sort((a,b)=>a.d<b.d?-1:1);save();render()},
+ weight(r){if(!r.w)return false;const rep=w=>r.cur&&w.kg===r.cur.kg&&w.t===r.cur.t;if(S.weights.some(w=>w.d===r.w.d&&!w.sample&&w!==r.w&&!rep(w)))return toast('You logged a newer weigh-in for that day. Delete it first to bring this one back.');S.weights=S.weights.filter(w=>w.d!==r.w.d||w.sample);S.weights.push(r.w);S.weights.sort((a,b)=>a.d<b.d?-1:1);save();render()},
  gtg(r){const g=gtgDay(r.d),arr=g[r.m]=g[r.m]||[];arr.splice(Math.min(r.i,arr.length),0,r.v);
    if(r.pr&&!(S.gtg.max[r.m]||[]).some(x=>x.d===r.pr.d&&x.v===r.pr.v&&x.src===r.pr.src))(S.gtg.max[r.m]=S.gtg.max[r.m]||[]).push(r.pr);save();render()},
  tape(r){const a=S[r.f];if(!Array.isArray(a)||!r.v)return false;if(a.some(x=>x.d===r.v.d&&x!==r.v))return toast('You logged a newer measure for that day. Delete it first to bring this one back.');S[r.f]=a.filter(x=>x.d!==r.v.d);S[r.f].push(r.v);S[r.f].sort((x,y)=>x.d<y.d?-1:1);save();render()}
@@ -674,7 +676,7 @@ function warmupCard(a){
 const mealSig=items=>items.map(i=>i.n+'×'+i.x).sort().join('|');
 const mealName=items=>items.map(i=>i.n.replace(/\s*\(.*?\)\s*/g,' ').trim()+(i.x!==1?' ×'+i.x:'')).join(', ');
 const mealK=items=>items.reduce((a,i)=>a+i.k*i.x,0),mealP=items=>items.reduce((a,i)=>a+i.pr*i.x,0);
-const strip=e=>({n:e.n,k:e.k,pr:e.pr,c:e.c,f:e.f,x:e.x,...(e.fi?{fi:e.fi}:{}),...(e.p?{p:e.p}:{}),...(e.pg?{pg:e.pg}:{})});
+const strip=e=>({n:e.n,k:e.k,pr:e.pr,c:e.c,f:e.f,x:e.x,...(e.src==='ai'?{src:'ai'}:{}),...(e.ak>0?{ak:e.ak}:{}),...(e.fi?{fi:e.fi}:{}),...(e.p?{p:e.p}:{}),...(e.pg?{pg:e.pg}:{})});
 // Grams (or ml) in a portion text like "1 plate, ~400 g" or "250 ml".
 const portionG=p=>{const m=String(p||'').match(/(\d+(?:\.\d+)?)\s*(g|ml)\b/);return m?{G:+m[1],u:m[2]}:null};
 // What one portion of a logged entry is: its own note, the "(150 g)" in its name, or the food it came from.
@@ -768,10 +770,14 @@ function checkin(){
   const p=S.profile,rate=weeklyRate(),w4=waist4w();
   const band={gain:[0.15,0.35],recomp:[-0.1,0.1],cut:[-0.7,-0.3]}[p.goal];
   const crNew=p.creatineStart&&diffDays(p.creatineStart,TODAY)<21;
-  const n=countedW().length;
+  const n=countedW().filter(w=>!w.sample).length;
+  if(S.weights.some(w=>w.sample))return {txt:'Clear the preview weigh-ins on Progress first. They are only there to show the chart.',adj:0};
   if(rate==null||n<7)return {txt:`Needs a week of morning weigh-ins. Your first check-in unlocks after 7 (${n} so far).`,adj:0};
   if(p.ciLast&&diffDays(p.ciLast,TODAY)<7)return {txt:`You applied ${p.ciAdj>0?'+':''}${p.ciAdj} kcal on ${fmtDate(p.ciLast)}. Give it a week: next check-in ${fmtDate(addDays(p.ciLast,7))}. Right now: ${rate>0?'+':''}${rate.toFixed(2)} kg/week.`,adj:0,wait:true};
   if(w4&&w4.d>1.5&&p.goal!=='cut')return {txt:`Waist up ${w4.d.toFixed(1)} cm since ${fmtDate(w4.from)}. Too much of the gain is fat. Drop 200 kcal.`,adj:-200};
+  const rt=r=>r>0?`Gaining ${r.toFixed(2)} kg/week`:`Losing ${Math.abs(r).toFixed(2)} kg/week`;
+  if(p.goal==='cut'&&rate>band[1]&&!crNew)return {txt:`${rt(rate)}, less than the ${Math.abs(band[1])} kg/week a cut needs. Drop 150 kcal.`,adj:-150};
+  if(p.goal==='cut'&&rate<band[0])return {txt:`${rt(rate)}, faster than ${Math.abs(band[0])} kg/week. That costs muscle. Add 150 kcal.`,adj:150};
   if(rate>band[1]&&!crNew)return {txt:`Gaining ${rate.toFixed(2)} kg/week, faster than ${band[1]}. Drop 150 kcal.`,adj:-150};
   if(rate>band[1]&&crNew)return {txt:`Gaining ${rate.toFixed(2)} kg/week, but you started creatine recently. Mostly water. No change.`,adj:0};
   if(rate<band[0])return {txt:`${rate.toFixed(2)} kg/week, slower than ${band[0]}. Add 150 kcal.`,adj:150};
@@ -987,6 +993,11 @@ function sheetHTML(){
    <div class="stack">${ws.map(w=>`<div class="row between card flat" style="padding:10px 12px"><div><b>${w.kg} kg</b> <span class="small muted">${fmtDate(w.d)}${w.t?' · '+w.t:''}</span></div>
      <div class="row" style="gap:6px"><button class="chip ${w.fasted===false?'warn':'good'}" data-a="wtog" data-d="${w.d}">${w.fasted===false?'Not fasted':'Fasted'}</button><button class="icon-btn s" data-a="wdel" data-d="${w.d}" aria-label="Delete ${fmtDate(w.d)}">${I.x}</button></div></div>`).join('')||'<p class="small muted">No weigh-ins yet.</p>'}</div>
    <p class="small muted">Tap Fasted / Not fasted to switch. Only fasted ones count toward the trend.</p>`}
+  if(s.kind==='shake'){const last=S.profile.shake||{},sp=S.supps[TODAY]||{},crOk=hasSupp('cr'),fe=sp.feAt!=null&&sp.feAt+60>nowMinD()?sp.feAt+60:null;
+   body=`<h2>Protein shake</h2><p class="small muted">Rule 1 whey and semi-skimmed milk${crOk?', plus creatine':''}, logged as one item.</p>
+   ${fe!=null?`<p class="small"><b class="hi">Iron was less than an hour ago.</b> Milk and whey block it. Better after ${hm(fe)}.</p>`:''}
+   <div class="stack">${[1,1.5,2].map(v=>{const x=shakeItem(v,false);return `<button class="btn block${last.sc===v?' primary':''}" data-a="shake" data-v="${v}">${v} scoop${v>1?'s':''} · ${x.ml} ml milk <span class="small${last.sc===v?'':' muted'}">· ${x.k} kcal · ${x.pr} g protein</span></button>`}).join('')}</div>
+   ${crOk?`<label class="row" style="gap:8px"><input id="shCr" type="checkbox" ${!sp.cr&&last.cr!==false?'checked':''} style="width:20px;height:20px"><span class="small">5 g creatine in it${sp.cr?' (creatine already ticked today)':''}</span></label>`:''}`}
   if(s.kind==='steps'){body=`<h2>Steps today</h2><input id="stIn" class="num" type="number" inputmode="numeric" placeholder="e.g. 6500" aria-label="Steps"><button class="btn primary block" data-a="logsteps">Save</button>${hook('steps')}`}
   if(s.kind==='max'){const m=MOVES.find(x=>x.id===s.m),h=S.gtg.max[m.id]||[];body=`<h2>${m.n}: ${m.u==='s'?'best hold':'max test'}</h2><p class="small">${m.u==='s'?'Fresh, forearms down, one straight line. Stop the clock when your hips sag or drop.':'Fresh, after a warm-up, one all-out set with clean reps only.'}</p>
    ${m.u==='s'?`<div class="holdclock" id="pclock">${UI.pt?Math.floor((Date.now()-UI.pt)/1000):s.v||0}</div><button class="btn block" data-a="ptime">${UI.pt?'Stop':'Start clock'}</button>`:''}
@@ -1447,10 +1458,16 @@ const feCur=()=>{const s=UI.sheet;if(!s||s.kind!=='fedit'||!s.e)return null;retu
 // Only what you actually changed is kept over MFP's numbers (amount, or the numbers you typed), so a later fix in MFP still comes through for the rest.
 function keepImp(e,d,keys=['x']){if(!e||!e.iid)return;S.impEdit=S.impEdit||{};const o={...(S.impEdit[e.iid]||{}),d};keys.forEach(k=>{o[k]=e[k]});S.impEdit[e.iid]=o}
 // Opened from a meal's "+" on the Food screen (UI.slotT), new food lands in that meal, today or on a past day.
+// Protein shake: Rule 1 whey (R1 Whey Blend label, per scoop) + semi-skimmed milk (per 100 ml) + optional 5 g creatine (0 kcal),
+// logged as ONE food item. Milk scales with the scoops: 1 → 200 ml, 1.5 → 250 ml, 2 → 300 ml.
+const SHAKE={wh:{k:130,pr:24,c:3,f:2},milk:{k:46,pr:3.2,c:4.8,f:1.5},ml:{1:200,1.5:250,2:300}};
+function shakeItem(sc,cr){const ml=SHAKE.ml[sc]||250,m=ml/100,w=SHAKE.wh,mk=SHAKE.milk,r=v=>Math.round(v),q=x=>r(w[x]*sc+mk[x]*m);
+  return {n:'Protein shake',k:q('k'),pr:q('pr'),c:q('c'),f:q('f'),fi:0,x:1,auto:'wh',sc,ml,cr:!!cr,
+    sub:sc+' scoop'+(sc>1?'s':'')+' Rule 1 whey · '+ml+' ml milk'+(cr?' · 5 g creatine':'')}}
 const pushFood=e=>{const d=e.auto?TODAY:foodDayNow();e=e.g||e.auto?e:{...e,g:newG()};if(e.t==null&&!e.auto&&UI.slotT!=null)e={...e,t:UI.slotT};else if(e.t==null&&d===TODAY)e={...e,t:nowMin()};(S.food[d]=S.food[d]||[]).push(e)};
 function putWeight(d,kg,t,fasted){const old=S.weights.find(w=>w.d===d&&!w.sample);S.weights=S.weights.filter(w=>w.d!==d&&!w.sample);S.weights.push({d,kg,t,fasted});S.weights.sort((a,b)=>a.d<b.d?-1:1);save();return old}
 // A second weigh-in on the same day replaces the first, so say so and offer it back.
-function weightToast(d,old,msg){if(old&&old.kg!=null){const rec={k:'weight',w:old};toast('Replaced '+old.kg+' kg ('+fmtDate(d)+')',()=>HIST_DO.weight(rec),null,rec)}else toast(msg)}
+function weightToast(d,old,msg){if(old&&old.kg!=null){const nw=S.weights.find(w=>w.d===d&&!w.sample),rec={k:'weight',w:old,cur:nw?{kg:nw.kg,t:nw.t}:null};toast('Replaced '+old.kg+' kg ('+fmtDate(d)+')',()=>HIST_DO.weight(rec),null,rec)}else toast(msg)}
 function logWeight(v){if(!(v>40&&v<150))return toast('Enter your weight in kg, e.g. 76.4');const t=nowHM();
   if(!isMorning(t)){UI.sheet={kind:'wconfirm',kg:v,t};renderSheet();return}
   const old=putWeight(TODAY,v,t,true);render();weightToast(TODAY,old,'Weigh-in saved')}
@@ -1501,7 +1518,7 @@ const A={
  lgdelyes:()=>{const i=S.log.indexOf(UI.sheet.e),e=UI.sheet.e,p=S.program.find(x=>x.id===e.day),rec={k:'log',e};if(i>=0)S.log.splice(i,1);UI.sheet=null;save();render();toast('Deleted '+(p?p.name:'session')+', '+fmtDate(e.d),()=>HIST_DO.log(rec),null,rec)},
  wpast:()=>{UI.sheet={kind:'wpast'};renderSheet()},
  // A past workout is only a draft until a set has reps, so an abandoned form never leaves an empty session behind.
- wpastgo:t=>{const p=S.program.find(x=>x.id===t.dataset.id),ex={};if(!p)return;p.ex.forEach(({x,s})=>{const sg=suggest(def(x));ex[x]=Array.from({length:s},()=>[+sg.kg||0,0])});
+ wpastgo:t=>{const p=S.program.find(x=>x.id===t.dataset.id),ex={};if(!p)return;p.ex.forEach(({x,s})=>{const sg=suggest(def(x));ex[x]=(ex[x]||[]).concat(Array.from({length:s},()=>[+sg.kg||0,0]))});
    const di=$('#wpD');if(di&&di.value&&di.value>=TODAY)return toast('For today, start the session from the plan instead');const d=di&&di.value?di.value:addDays(TODAY,-1);UI.sheet={kind:'wlog',e:{d,day:p.id,ex,draft:true}};renderSheet()},
  exlib:()=>{UI.sheet={kind:'exlib'};renderSheet()}, libm:t=>{UI.libM=t.dataset.m;renderSheet()},
  exinfo:t=>{const back=UI.sheet&&UI.sheet.kind==='exlib';UI.sheet={kind:'exinfo',id:t.dataset.id,back};renderSheet();const sh=document.querySelector('.sheet');if(sh)sh.scrollTop=0},
@@ -1555,7 +1572,7 @@ const A={
    const f=window.NX&&NX.saveBefore?await NX.saveBefore(prev):null;
    S=normalize(pend);if(S.profile.restTimer==null)S.profile.restTimer=true;S.hist=[];HIST=[];TODAY=dayNow();skSync(false);save();UI.sheet=null;render();if(typeof photoSync==='function')photoSync();
    toast('Backup restored'+(f?'. Old data saved to '+f:''),undoRestore)},
- undorestore:()=>undoRestore(),
+ undorestore:()=>{const n=Date.now();if(!(UI.urT&&n-UI.urT<5000)){UI.urT=n;return toast('Tap again to undo the restore. Everything logged since the restore will be lost.')}UI.urT=0;undoRestore()},
  importno:()=>{UI.sheet.pending=null;renderSheet()},
  mapmode:t=>{UI.mapMode=t.dataset.v;render()},
  // workout
@@ -1588,7 +1605,7 @@ const A={
  swapopen:t=>{UI.swapQ='';UI.swapKeep=false;const prev=UI.sheet;UI.sheet={kind:'swap',mode:t.dataset.mode,x:+t.dataset.x,day:prev&&prev.day,e:prev&&prev.e,lid:t.dataset.id};renderSheet()},
  // Logged session: drop one exercise (undo brings it back in the same place).
  lgexrm:t=>{if(tapTwice())return;const sh=UI.sheet,e=sh.e,id=t.dataset.id,old=e.ex;if(!old[id])return;e.ex=Object.fromEntries(Object.entries(old).filter(([k])=>k!==id));save();renderSheet();
-   toast('Removed '+def(id).n+' from '+fmtDate(e.d),()=>{e.ex=old;if(!e.draft&&!S.log.includes(e)){S.log.push(e);sortLog()}save();render()})},
+   toast('Removed '+def(id).n+' from '+fmtDate(e.d),()=>{if(!e.draft&&!S.log.includes(e))return toast('That session was deleted, so the exercise cannot come back');e.ex={...e.ex,[id]:old[id]};save();render()})},
  swappick:t=>applySwap(t.dataset.id),
  swapcustom:()=>{const n=$('#cxN').value.trim();if(!n)return toast('Give it a name');const m=$('#cxM').value,id='c_'+Date.now();
    S.customEx[id]={n,g:FIG_FOR[m],m:{[m]:1},r:[8,12],rest:90,u:'kg'};applySwap(id)},
@@ -1632,6 +1649,8 @@ const A={
  addfood:t=>{const {f}=UI.sheet,x=Math.round(UI.sheet.x*100)/100;if(!(x>0))return toast('Pick an amount');if(bigAsk(f.k*x,()=>A.addfood({dataset:{ok:1}}),t))return;pushFood({n:f.n,k:f.k,pr:f.pr,c:f.c,f:f.f,fi:f.fi||0,x,...(f.p?{p:f.p}:{})});save();UI.sheet=null;render();toast('Added '+f.n)},
  delfood:t=>{const fs=UI.sheet&&UI.sheet.kind==='fedit',d=fs?UI.sheet.d:TODAY,a=S.food[d]||[],e=fs?feCur():a[+t.dataset.i];if(!e)return;const i=a.indexOf(e);a.splice(i,1);
    if(e.iid){S.impDel=S.impDel||{};S.impDel[e.iid]=d}
+   // Removing the shake also clears the Whey tick (and creatine, if it came with the shake), so tapping Whey offers it again.
+   if(e.auto==='wh'&&!a.some(x=>x.auto==='wh')){const s=S.supps[d]||{};delete s.wh;if(s.crBy==='wh'){delete s.cr;delete s.crBy}}
    if(fs)UI.sheet=null;save();render();const rec={k:'food',d,e,i};toast('Removed '+e.n.replace(/ · MFP$/,'')+(d===TODAY?'':' ('+fmtDate(d)+')'),()=>HIST_DO.food(rec),null,rec)},
  fedit:t=>{const d=t.dataset.d||TODAY;UI.sheet={kind:'fedit',d,e:(S.food[d]||[])[+t.dataset.i]};renderSheet()},
  fx:t=>{const e=feCur();if(!e)return;e.x=+t.dataset.x;keepImp(e,UI.sheet.d);save();render()},

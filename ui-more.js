@@ -200,7 +200,7 @@ function interpret(raw){
   const s=(raw||'').trim().toLowerCase();if(!s)return null;let m;const num=x=>parseFloat(String(x).replace(',','.'));
   // Each one says what it replaces, if today already has a value.
   const rep=(v,u)=>v!=null?` <span class="muted">· replaces ${v}${u}</span>`:'';
-  if((m=s.match(/^(\d{2,3}(?:[.,]\d{1,2})?)\s*(?:kg)?$/))){const v=num(m[1]),w=S.weights.find(x=>x.d===TODAY&&!x.sample);if(v>40&&v<150)return {txt:`Weight <b>${v} kg</b>${rep(w&&w.kg,' kg')}`,run:()=>{UI.sheet=null;logWeight(v);return 'keep'}}}
+  if((m=s.match(/^(\d{2,3}(?:[.,]\d{1,2})?)\s*(?:kg)?$/))){const v=num(m[1]),w=S.weights.find(x=>x.d===TODAY&&!x.sample);if(v>40&&v<150&&(/kg|[.,]/.test(s)||Math.abs(v-W())<=8))return {txt:`Weight <b>${v} kg</b>${rep(w&&w.kg,' kg')}`,run:()=>{UI.sheet=null;logWeight(v);return 'keep'}}}
   if((m=s.match(/^(?:sleep|slept)\s*(\d{1,2}(?:[.,]\d+)?)\s*h?$/)||s.match(/^(\d{1,2}(?:[.,]\d+)?)\s*h(?:ours?|rs?)?(?:\s*(?:of\s*)?sleep)?$/))){const v=num(m[1]),o=S.sleep[TODAY];if(v>0&&v<=16)return {txt:`Sleep <b>${v} h</b>${rep(o,' h')}`,run:()=>{const d=TODAY;S.sleep[d]=v;save();toast('Sleep saved · '+v+' h',()=>{if(o==null)delete S.sleep[d];else S.sleep[d]=o;save();render()})}}}
   if((m=s.match(/^steps?\s*(\d{3,6})$/)||s.match(/^(\d{3,6})\s*steps?$/))){const v=+m[1],o=S.steps[TODAY];if(v<=60000)return {txt:`Steps <b>${fmt(v)}</b>${rep(o!=null?fmt(o):null,'')}`,run:()=>{const d=TODAY;S.steps[d]=v;save();toast(fmt(v)+' steps saved',()=>{if(o==null)delete S.steps[d];else S.steps[d]=o;save();render()})}}}
   if((m=s.match(/^waist\s*(\d{2,3}(?:[.,]\d)?)(?:\s*cm)?$/))){const v=num(m[1]),o=S.waist.find(x=>x.d===TODAY);if(v>50&&v<150)return {txt:`Waist <b>${v} cm</b>${rep(o&&o.cm,' cm')}`,run:()=>{S.waist=S.waist.filter(w=>w.d!==TODAY);S.waist.push({d:TODAY,cm:v});save();toast('Waist saved')}}}
@@ -287,7 +287,7 @@ function sheetX0(s){
     return `<h2>Repeats</h2><p class="small muted">One tap adds the whole meal. ☆ pins it for good.</p>
      ${yest.length&&foodDayNow()===TODAY?`<button class="btn" data-a="copyyest">${ic('repeat')} Same as yesterday · ${yest.length} meal${yest.length>1?'s':''}</button>`:''}
      ${rec.length?by.map((ms,sl)=>ms.length?`<p class="label" style="margin-top:4px">${SLOT_N[sl]}</p><div class="recent">${ms.map(mealRow).join('')}</div>`:'').join('')+(rest.length?`<p class="label" style="margin-top:4px">Other</p><div class="recent">${rest.map(mealRow).join('')}</div>`:''):'<p class="small muted">Meals you log show up here.</p>'}`}
-  if(k==='hist'){const td=TODAY,tm=h=>{const d=new Date(h.at),day=ymd(d);return (day===td?'':fmtDate(day)+' · ')+pad(d.getHours())+':'+pad(d.getMinutes())};
+  if(k==='hist'){const td=TODAY,tm=h=>{const d=new Date(h.at),day=dayOf(h.at);return (day===td?'':fmtDate(day)+' · ')+pad(d.getHours())+':'+pad(d.getMinutes())};
     return `<h2>Recent changes</h2><p class="small muted">Did something by mistake? Take it back here, newest first. Things you deleted (food, sessions, weigh-ins, rep sets, tape measures) are kept for 7 days. Other changes can be undone until the app is closed.</p>
      ${HIST.length?`<div class="list">${HIST.map((h,i)=>`<div class="li"><span class="grow small"><b class="hi">${esc(h.t)}</b><br><span class="tiny muted">${tm(h)}${h.rec?' · kept 7 days':''}</span></span><button class="btn sm" data-a="histundo" data-i="${h.id}">Undo</button></div>`).join('')}</div>`:'<p class="small muted">Nothing to undo right now.</p>'}`}
   if(k==='settings')return settingsSheet(s);
@@ -520,6 +520,11 @@ const after=(n,fn)=>{const f=A[n];if(f)A[n]=(...a)=>{const r=f(...a);fn(...a);re
 const shut=kinds=>()=>{if(UI.sheet&&kinds.includes(UI.sheet.kind)){UI.sheet=null;render()}};
 const shutIf=(kinds,done)=>()=>{if(done())shut(kinds)()};
 after('offadd',shutIf(['scan'],()=>!(UI.off&&UI.off.p)));after('offmanual',shutIf(['scan'],()=>!(UI.off&&UI.off.manual)));after('aiadd',shutIf(['describe'],()=>!(UI.ai&&UI.ai.items)));after('adddesc',shutIf(['describe'],()=>!UI.desc));
+// Creatine: the first weeks add water weight, so the weekly check-in doesn't read it as fat. Coming back after 2+ weeks off starts that grace again.
+function crStart(on){const p=S.profile;if(on){const recent=Array.from({length:14},(_,i)=>i+1).some(i=>(S.supps[addDays(TODAY,-i)]||{}).cr);
+    if(!p.creatineStart){p.creatineStart=TODAY;toast('Creatine start date saved')}
+    else if(!recent&&diffDays(p.creatineStart,TODAY)>=21){p.crPrev=p.creatineStart;p.creatineStart=TODAY;toast('Back on creatine after a break. Water weight over the next 3 weeks is not read as fat.')}}
+  else if(p.creatineStart===TODAY){p.creatineStart=p.crPrev||null;delete p.crPrev}}
 Object.assign(A,{
  tab:t=>{const k=t.dataset.t;UI.enter=UI.tab!==k||!!t.dataset.tt;UI.tab=k;if(t.dataset.tt)UI.trainTab=t.dataset.tt;UI.foodQ='';UI.foodDay=null;UI.sheet=null;UI.slotT=null;render();scrollTo(0,0)},
  // Closing a sheet with something typed but not saved asks once ("tap again"), then lets go.
@@ -542,11 +547,12 @@ Object.assign(A,{
      S.log.forEach(l=>{if(l.d===was)l.d=now});if(S.active&&S.active.d===was){S.active.d=now;S.active.past=false}
      ['weights','waist','neck','arm'].forEach(k=>{const a=S[k];if(!Array.isArray(a))return;a.forEach(w=>{if(w.d===was&&!w.sample&&!a.some(z=>z.d===now&&!z.sample))w.d=now})})}
    else if(now>was){// Back to an earlier end, after midnight: what was logged since midnight goes to the new day.
-     const cut=new Date();cut.setHours(0,0,0,0);const late=e=>{const t=e.g?parseInt(String(e.g).slice(0,-3),36):0;return t>=+cut&&t<=Date.now()};
+     const cut=new Date();cut.setHours(0,0,0,0);const late=e=>{if(!e.g)return false;const g=String(e.g),a=parseInt(g.slice(0,-3),36),b=parseInt(g,36),t=a>1.6e12&&a<=Date.now()?a:b;return t>=+cut&&t<=Date.now()};
      const mv=(S.food[was]||[]).filter(e=>!e.iid&&!e.auto&&late(e));
      if(mv.length){S.food[was]=S.food[was].filter(e=>!mv.includes(e));if(!S.food[was].length)delete S.food[was];(S.food[now]=S.food[now]||[]).push(...mv)}
      S.log.forEach(l=>{if(l.d===was&&l.ts>=+cut)l.d=now});if(S.active&&S.active.d===was&&S.active.start>=+cut)S.active.d=now}
-   TODAY=now;save();render();toast(v?'Your day now runs until '+hm(v)+'. Late-night logs count for the day before.':'Your day ends at midnight')},
+   (S.aiq||[]).forEach(q=>{if(!(S.food[q.d]||[]).some(e=>e.pend===q.id)){const d=Object.keys(S.food).find(k=>(S.food[k]||[]).some(e=>e.pend===q.id));if(d)q.d=d}});
+   TODAY=now;save();render();if(typeof mfpSync==='function'){if(S.profile.mfp)mfpSync(true);if(S.profile.mfpUser)mfpDiary(true);if(S.profile.hcOn)hcRead(true)}toast(v?'Your day now runs until '+hm(v)+'. Late-night logs count for the day before.':'Your day ends at midnight')},
  activetoday:()=>{const a=S.active;if(!a)return;a.d=TODAY;a.past=false;a.start=Date.now();save();render();toast('Now counts as today\'s session')},
  slotadd:t=>{const k=+t.dataset.k;UI.slotT=SLOT_T[k];UI.sheet={kind:'slotadd',k};renderSheet();UI.slotT=SLOT_T[k]},
  // Only this food moves (it leaves its meal group); the rest of the meal stays where it was.
@@ -636,15 +642,21 @@ Object.assign(A,{
  logw3:()=>{const v=parseFloat($('#wIn3').value);if(!(v>40&&v<150))return toast('Enter your weight in kg, e.g. 76.4');UI.sheet=null;logWeight(v)},
  setsleep:t=>{const v=t.dataset.v!=null?+t.dataset.v:parseFloat((($('#slIn2')||{}).value||'').replace(',','.'));if(!(v>0&&v<=16))return toast('Hours slept, e.g. 4.5');
    const d=TODAY,o=S.sleep[d];S.sleep[d]=Math.round(v*100)/100;UI.sheet=null;save();render();toast('Sleep saved · '+S.sleep[d]+' h',()=>{if(o==null)delete S.sleep[d];else S.sleep[d]=o;save();render()})},
- supp:t=>{const k=t.dataset.k,s=S.supps[TODAY]=S.supps[TODAY]||{};s[k]=!s[k];
+ supp:t=>{const k=t.dataset.k,s=S.supps[TODAY]=S.supps[TODAY]||{};
+   // Whey opens the shake picker (scoops, milk, creatine); the shake is logged from there.
+   if(k==='wh'&&!s.wh){UI.sheet={kind:'shake'};renderSheet();return}
+   s[k]=!s[k];
    if(k==='fe'){if(s.fe)s.feAt=nowMinD();else delete s.feAt}
-   // Creatine: the first weeks add water weight, so the weekly check-in doesn't read it as fat. Coming back after 2+ weeks off starts that grace again.
-   if(k==='cr'){const p=S.profile;if(s.cr){const recent=Array.from({length:14},(_,i)=>i+1).some(i=>(S.supps[addDays(TODAY,-i)]||{}).cr);
-       if(!p.creatineStart){p.creatineStart=TODAY;toast('Creatine start date saved')}
-       else if(!recent&&diffDays(p.creatineStart,TODAY)>=21){p.crPrev=p.creatineStart;p.creatineStart=TODAY;toast('Back on creatine after a break. Water weight over the next 3 weeks is not read as fat.')}}
-     else if(p.creatineStart===TODAY){p.creatineStart=p.crPrev||null;delete p.crPrev}}
-   if(k==='wh'){if(s.wh)pushFood({n:'Whey protein',k:120,pr:24,c:3,f:2,x:1,auto:'wh'});else{const a=S.food[TODAY]||[],i=a.findIndex(e=>e.auto==='wh');if(i>=0)a.splice(i,1)}}
+   if(k==='cr'){crStart(s.cr);delete s.crBy}
+   // Unticking whey takes the shake off today's food, and the creatine tick too if it came with the shake.
+   if(k==='wh'){const a=S.food[TODAY]||[],i=a.findIndex(e=>e.auto==='wh');if(i>=0)a.splice(i,1);if(s.crBy==='wh'){s.cr=false;delete s.crBy;crStart(false)}}
    save();buzz(15);render()},
+ shake:t=>{const sc=+t.dataset.v,s=S.supps[TODAY]=S.supps[TODAY]||{},box=$('#shCr'),cr=!!(box&&box.checked);
+   const a=S.food[TODAY]||[],i=a.findIndex(e=>e.auto==='wh');if(i>=0)a.splice(i,1);
+   const e=shakeItem(sc,cr);pushFood(e);s.wh=true;
+   if(cr&&!s.cr){s.cr=true;s.crBy='wh';crStart(true)}
+   if(box)S.profile.shake={sc,cr};else S.profile.shake={...(S.profile.shake||{}),sc};
+   UI.sheet=null;save();buzz(15);render();toast('Protein shake · '+e.k+' kcal · '+e.pr+' g protein')},
  anygo:()=>{const r=interpret(UI.any);if(!r)return toast('Type what you want to log');const keep=r.run()==='keep';UI.any='';if(!keep)UI.sheet=null;render()},
  anyai:()=>{freshAI();UI.desc=UI.any;UI.any='';UI.sheet={kind:'describe'};render()},
  scan:()=>{UI.sheet={kind:'scan'};renderSheet();if(window.NX&&NX.native&&A.livescan)A.livescan()},
@@ -714,7 +726,7 @@ document.addEventListener('keydown',e=>{const t=e.target;if(e.key!=='Enter'||t.t
 document.addEventListener('change',async e=>{const t=e.target,c=t.dataset.c;if(!c)return;
   if(c==='ob'&&UI.ob){UI.ob[t.dataset.f]=t.value}
   if(c==='obram'&&UI.ob){UI.ob.ram=t.checked}
-  if(c==='setstr'&&t.value){S.profile[t.dataset.f]=t.value;save()}
+  if(c==='setstr'&&t.value){if(t.dataset.f==='dob'){const a=diffDays(t.value,TODAY)/365.25;if(!(a>=12&&a<=90)){t.value=S.profile.dob||'';return toast('Check the birth date year')}}S.profile[t.dataset.f]=t.value;save()}
   if(c==='ramcity'){if(t.value){S.profile.ramCityId=t.value;delete S.profile.ramLat;delete S.profile.ramLon;delete S.profile.ramCity;save();renderSheet()}}
   if(c==='gymat'&&t.value){S.profile.gymAt=t.value;S.profile.gymPin=true;save();render();toast('Gym time pinned at '+t.value)}
   if(c==='gymPin'){S.profile.gymPin=t.checked;if(t.checked&&!S.profile.gymAt){const gl=gymLearned();S.profile.gymAt=gl!=null?hm(gl):'18:00'}save();render()}
