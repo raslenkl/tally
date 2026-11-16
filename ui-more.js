@@ -633,7 +633,7 @@ Object.assign(A,{
    try{const prog=c.mode==='progress',blob=await camGrab(prog?2560:1280,prog?.92:.85,prog&&c.facing==='user');beep(1320,120);buzz(40);
      if(prog){await photoAdd(blob,TODAY,c.pose);const nx={front:'side',side:'back'}[c.pose];CAM.busy=false;if(nx){toast('Saved. Next: '+nx);c.pose=nx;renderCam()}else{toast('All three saved');A.camclose()}return}
      const b64=await blobB64(blob);CAM.busy=false;A.camclose();
-     if(c.mode==='meal'){if(UI.snap)URL.revokeObjectURL(UI.snap.url);UI.snap={url:URL.createObjectURL(blob),b64};UI.ai={};if(!UI.sheet||UI.sheet.kind!=='describe')UI.sheet={kind:'describe'};render();toast('Photo added. A few words help, then Estimate.')}
+     if(c.mode==='meal'){const u=URL.createObjectURL(blob);if(window.addSnap)addSnap(u,b64);else UI.snaps=[{url:u,b64}];UI.ai={};if(!UI.sheet||UI.sheet.kind!=='describe')UI.sheet={kind:'describe'};render();toast((UI.snaps||[]).length>1?'Photo '+UI.snaps.length+' added':'Photo added. Add more angles or a few words, then Estimate.')}
      else if(window.NX&&NX.bfRun)NX.bfRun(b64)}
    catch(e){CAM.busy=false;toast('Could not take the photo: '+(e.message||e))}}
 });

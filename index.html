@@ -100,7 +100,10 @@ const CUES={
  pushup:['Body in one straight line','Chest touches the floor every rep','Elbows about 45°'],
  plank:['Squeeze glutes, ribs down','Push the floor away'],
  hangraise:['No swinging','Curl the pelvis up, not just the knees'],
- hollow:['Lower back glued to the floor','Arms and legs only as low as you can hold']
+ hollow:['Lower back glued to the floor','Arms and legs only as low as you can hold'],
+ shrug:['Straight up toward the ears, no rolling','Hold 1 s at the top'],
+ carry:['Tall posture, shoulders down','Grip hard, short quick steps'],
+ twist:['Turn from the ribs, hips stay still','Slow and controlled, no momentum']
 };
 
 /* ===================== Exercise library + default plan (all loads in kg) ===================== */
@@ -156,6 +159,89 @@ const LIB={
  mcrunch:L('Machine crunch','crunch',{abs:1},[10,15],60), decsit:L('Decline sit-up','situp',{abs:1},[10,15],60,'bw'), hkr:L('Hanging knee raise','hangraise',{abs:1},[10,15],60,'bw'),
  chop:L('Cable woodchop','crunch',{abs:1},[10,15],60)
 };
+// The rest of a well-equipped gym: machines (selectorised and plate-loaded), cables, free weights, bodyweight.
+Object.assign(LIB,{
+ // chest
+ hcfly:L('High-to-low cable fly','fly',{chest:1},[10,15],75), cfly1:L('One-arm cable fly','fly',{chest:1},[12,15],60), incdbfly:L('Incline DB fly','fly',{chest:1,fdelt:.3},[10,15],90),
+ inccfly:L('Incline cable fly','fly',{chest:1,fdelt:.3},[10,15],75), cpress:L('Standing cable chest press','pressflat',{chest:1,tri:.4},[10,15],90),
+ hspress:L('Plate-loaded chest press','pressflat',{chest:1,fdelt:.5,tri:.5},[6,10],150), hsinc:L('Plate-loaded incline press','pressinc',{chest:1,fdelt:.5,tri:.4},[6,10],150),
+ decmach:L('Decline machine press','pressflat',{chest:1,tri:.5},[8,12]), smincp:L('Smith incline press','pressinc',{chest:1,fdelt:.5,tri:.4},[6,10],150),
+ sqzpress:L('DB squeeze press','pressflat',{chest:1,tri:.5},[10,15],75), floorp:L('DB floor press','pressflat',{chest:1,tri:.6},[8,12],120),
+ dbpullover:L('DB pullover','pulldown',{chest:.6,back:1},[10,15],90), incpush:L('Incline push-ups','pushup',{chest:1,tri:.5},[12,25],60,'bw'),
+ decpush:L('Decline push-ups','pushup',{chest:1,fdelt:.5,tri:.5},[8,20],75,'bw'), defpush:L('Deficit push-ups','pushup',{chest:1,tri:.5},[8,20],75,'bw'),
+ asstdip:L('Assisted dip machine','dip',{chest:.7,tri:.8},[8,12],90), dbdecl:L('Decline DB press','pressflat',{chest:1,tri:.5},[8,12],120),
+ // back
+ asstpu:L('Assisted pull-up machine','pullup',{back:1,bi:.5},[6,12],120), invrow:L('Inverted row','row',{back:1,rdelt:.4,bi:.5},[8,15],90,'bw'),
+ hsrow:L('Plate-loaded row (iso-lateral)','row',{back:1,rdelt:.4,bi:.4},[8,12]), lowrow:L('Low row machine','row',{back:1,bi:.5},[8,12]),
+ highrow:L('High row machine','row',{back:1,rdelt:.4,bi:.4},[8,12]), crow1:L('One-arm seated cable row','row',{back:1,bi:.5},[10,15],75),
+ widecrow:L('Wide-grip cable row','row',{back:.8,rdelt:.7},[10,15],90), pendlay:L('Pendlay row','row',{back:1,rdelt:.4,bi:.5},[5,8],150),
+ smrow:L('Smith row','row',{back:1,bi:.5},[8,12]), kroc:L('Kroc row','row',{back:1,bi:.5,fore:.4},[12,20],120),
+ underpd:L('Underhand lat pulldown','pulldown',{back:1,bi:.7},[8,12]), kpd1:L('Kneeling one-arm cable pulldown','pulldown',{back:1},[10,15],60),
+ ropepull:L('Rope straight-arm pulldown','pulldown',{back:1},[12,15],60), dbpullbk:L('Lying DB pullover','pulldown',{back:1,chest:.4},[10,15],90),
+ rackpull:L('Rack pull','hinge',{back:1,glute:.6,ham:.4},[5,8],180), revhyper:L('Reverse hyper','hinge',{glute:1,ham:.6},[12,20],75),
+ bbshrug:L('Barbell shrug','shrug',{back:.6},[10,15],60), smshrug:L('Smith shrug','shrug',{back:.6},[10,15],60), mshrug:L('Machine shrug','shrug',{back:.6},[10,15],60),
+ cshrug:L('Cable shrug','shrug',{back:.6},[12,15],60),
+ // shoulders
+ cfrontr:L('Cable front raise','raise',{fdelt:1},[10,15],60), platefr:L('Plate front raise','raise',{fdelt:1},[10,15],60), sdlat:L('Seated DB lateral raise','raise',{sdelt:1},[10,20],60),
+ incylat:L('Lying incline lateral raise','raise',{sdelt:1},[12,20],60), clat1:L('One-arm cable lateral raise (behind back)','raise',{sdelt:1},[12,20],60),
+ bbuprow:L('Barbell upright row','raise',{sdelt:1,back:.3},[8,12],75), dbuprow:L('DB upright row','raise',{sdelt:1,back:.3},[10,15],60),
+ rdrow:L('Rear delt row','row',{rdelt:1,back:.5},[10,15],75), crdfly1:L('One-arm cable rear delt fly','raise',{rdelt:1},[12,20],60), yraise:L('Y-raise','raise',{sdelt:.6,rdelt:.6,back:.3},[10,15],60),
+ seatohp:L('Seated barbell press','ohpress',{fdelt:1,sdelt:.3,tri:.5},[6,10],150), landpress:L('Landmine press','ohpress',{fdelt:1,chest:.4,tri:.4},[8,12],90),
+ hssp:L('Plate-loaded shoulder press','ohpress',{fdelt:1,sdelt:.3,tri:.5},[6,10],150), pikepush:L('Pike push-ups','ohpress',{fdelt:1,tri:.6},[6,15],90,'bw'),
+ // biceps
+ dbpreach:L('DB preacher curl','curl',{bi:1},[8,12],75), cpreach:L('Cable preacher curl','curl',{bi:1},[10,15],60), ccurl1:L('One-arm cable curl','curl',{bi:1},[10,15],60),
+ hicurl:L('High cable curl','curl',{bi:1},[10,15],60), dragcurl:L('Drag curl','curl',{bi:1},[8,12],75), zottman:L('Zottman curl','curl',{bi:.8,fore:.7},[8,12],75),
+ xhammer:L('Cross-body hammer curl','curl',{bi:.7,fore:.6},[8,12],60), mcurl2:L('Machine bicep curl','curl',{bi:1},[10,15],60), bbrevcurl:L('Reverse barbell curl','curl',{fore:1,bi:.5},[10,15],60),
+ // triceps
+ xbodyext:L('Cross-body cable extension','pushdown',{tri:1},[12,15],60), revpd1:L('One-arm reverse-grip pushdown','pushdown',{tri:1},[12,15],60),
+ mtriext:L('Triceps extension machine','ohext',{tri:1},[10,15],75), tate:L('Tate press','skull',{tri:1},[10,15],60), dbkick:L('DB kickback','pushdown',{tri:1},[12,15],60),
+ cskull:L('Lying cable extension','skull',{tri:1},[10,15],60), ropeoh:L('Rope overhead extension','ohext',{tri:1},[10,15],75), bwext:L('Bodyweight triceps extension','skull',{tri:1},[8,15],75,'bw'),
+ // forearms and grip
+ revwcurl:L('Reverse wrist curl','curl',{fore:1},[12,20],45), bbwcurl:L('Behind-the-back wrist curl','curl',{fore:1},[12,20],45), farmer:L("Farmer's walk",'carry',{fore:1,back:.4,abs:.3},[20,40],90),
+ pinch:L('Plate pinch','carry',{fore:1},[20,40],60),
+ // legs
+ sllpress:L('Single-leg leg press','squat',{quad:1,glute:.6},[10,15],90), vsquat:L('V-squat machine','squat',{quad:1,glute:.5},[8,12],150), revhack:L('Reverse hack squat','squat',{glute:1,quad:.6,ham:.4},[8,12],150),
+ smsplit:L('Smith split squat','lunge',{quad:1,glute:.7},[8,12],90), dbsplit:L('DB split squat','lunge',{quad:1,glute:.7},[8,12],90), latlunge:L('Lateral lunge','lunge',{quad:.8,glute:.8},[8,12],75),
+ boxsq:L('Box squat','squat',{quad:.8,glute:.8},[5,8],180), jumpsq:L('Jump squat','squat',{quad:1,glute:.6},[8,15],75,'bw'), airsq:L('Air squat','squat',{quad:1,glute:.5},[15,30],60,'bw'),
+ sumo:L('Sumo deadlift','hinge',{glute:1,quad:.5,back:.6,ham:.5},[3,6],180), trapdl:L('Trap-bar deadlift','hinge',{quad:.7,glute:1,ham:.6,back:.6},[4,8],180),
+ slrdl:L('Single-leg RDL','hinge',{ham:1,glute:1},[8,12],90), pullthru:L('Cable pull-through','hinge',{glute:1,ham:.6},[12,15],75), kbswing:L('Kettlebell swing','hinge',{glute:1,ham:.6},[12,20],75),
+ adduct:L('Hip adduction machine','hinge',{glute:.4,quad:.4},[12,20],60), ghr:L('Glute-ham raise','legcurl',{ham:1,glute:.4},[5,10],120,'bw'),
+ smhip:L('Smith hip thrust','hinge',{glute:1,ham:.3},[8,12],120), hipmach:L('Hip thrust machine','hinge',{glute:1,ham:.3},[8,12],120), slhip:L('Single-leg hip thrust','hinge',{glute:1,ham:.3},[10,15],75,'bw'),
+ sllegext:L('Single-leg leg extension','legext',{quad:1},[10,15],60), sllcurl:L('Single-leg lying leg curl','legcurl',{ham:1},[10,15],60), dbcurlleg:L('DB leg curl','legcurl',{ham:1},[10,15],75),
+ donkey:L('Donkey calf raise','calf',{calf:1},[10,15],60), slcalf:L('Single-leg calf raise','calf',{calf:1},[10,20],60), tib:L('Tibialis raise','calf',{calf:.6},[15,25],45,'bw'),
+ // abs
+ captain:L("Captain's chair knee raise",'hangraise',{abs:1},[10,15],60,'bw'), lylraise:L('Lying leg raise','hangraise',{abs:1},[10,20],60,'bw'), revcrunch:L('Reverse crunch','crunch',{abs:1},[10,20],60,'bw'),
+ crunchf:L('Floor crunch','crunch',{abs:1},[15,25],45,'bw'), deccrunch:L('Decline crunch','crunch',{abs:1},[10,20],60,'bw'), bike:L('Bicycle crunch','crunch',{abs:1},[20,30],45,'bw'),
+ rtwist:L('Russian twist','twist',{abs:1},[20,30],45), pallof:L('Pallof press','twist',{abs:1},[10,15],45), sidebend:L('DB side bend','twist',{abs:1},[12,20],45),
+ ctwist:L('Cable twist','twist',{abs:1},[12,15],45), landtwist:L('Landmine twist','twist',{abs:1},[10,15],60), vup:L('V-up','situp',{abs:1},[8,15],60,'bw'),
+ t2b:L('Toes to bar','hangraise',{abs:1,back:.2},[5,12],90,'bw'), wipers:L('Hanging windshield wipers','hangraise',{abs:1},[6,12],75,'bw'), climbers:L('Mountain climbers','plank',{abs:1},[20,40],45,'bw')
+});
+LIB.pecdeck.n='Pec deck (machine fly)';LIB.revdeck.n='Reverse pec deck (rear delt machine)';LIB.pd1.n='One-arm cable pushdown';LIB.tbar.n='T-bar row (landmine row)';
+// Other names people use, so search finds a move whatever you call it.
+const EXALIAS={pecdeck:'machine pec fly butterfly chest fly seated fly',revdeck:'rear delt machine reverse fly machine rear fly',rdfly:'bent over reverse fly dumbbell rear fly',
+ crdfly:'cable reverse fly rear fly crossover',face:'rope face pull rear delt',cfly:'crossover cable crossover chest fly',lowfly:'low cable fly upper chest',hcfly:'crossover lower chest',
+ pd1:'single arm one hand triceps pushdown d-handle tricep',revpd1:'single arm one hand underhand triceps pushdown tricep',rope:'triceps pushdown tricep',barpd:'triceps pushdown tricep',vbarpd:'triceps pushdown tricep',
+ xbodyext:'single arm one hand cable triceps tricep extension',kick:'triceps tricep kickback',dbkick:'triceps tricep',ohtri:'triceps tricep french press',dbohtri:'triceps tricep french press',
+ skull:'lying triceps extension tricep french press',dipmach:'seated dip triceps press machine tricep',mtriext:'seated overhead triceps tricep',bwext:'bar triceps tricep',
+ mpress:'seated chest press machine',hspress:'hammer strength iso lateral chest press',hsinc:'hammer strength iso lateral incline',hsrow:'hammer strength iso lateral row',hssp:'hammer strength shoulder press',
+ msp:'seated shoulder press machine',mlat:'side raise lateral machine',latr:'side raise',clat:'side raise',tbar:'landmine',lunge:'walking lunges',
+ lpress:'leg press machine 45',hack:'hack squat machine',pend:'pendulum squat machine',legext:'quad extension',lcurl:'hamstring curl',slcurl:'hamstring curl seated',stlcurl:'hamstring curl standing',
+ abduct:'outer thigh glute machine',adduct:'inner thigh adductor',hipthrust:'glute bridge barbell',hipmach:'glute drive',hyper:'hyperextension 45 degree back raise',
+ crunch:'rope kneeling cable crunch abs',mcrunch:'ab crunch machine abs',hlr:'abs',hkr:'abs',captain:'vertical knee raise roman chair abs',
+ pullup:'pull up chin',chinup:'chin up',asstpu:'assisted pull up gravitron',asstdip:'assisted dips gravitron',dips:'parallel bar dips',invrow:'australian pull up body row',
+ mpd:'lat pulldown machine',pdwide:'lat pulldown',pdclose:'lat pulldown v-bar close grip',neutpd:'lat pulldown',sapd:'single arm lat pulldown',sapull:'lat pullover cable straight arm',
+ crow:'low row cable row',mrow:'seated row machine',csrow:'chest supported row machine',cswide:'chest supported row machine',
+ calf:'calves standing machine',scalf:'calves seated',lpcalf:'calves',smcalf:'calves',dl:'conventional deadlift',rdl:'romanian deadlift rdl',dbrdl:'rdl',
+ bss:'rear foot elevated split squat',farmer:'farmers carry',shrug:'traps',bbshrug:'traps',smshrug:'traps',mshrug:'traps',cshrug:'traps',
+ bayes:'behind body cable curl',preacher:'scott curl',mcurl:'preacher machine',hammer:'neutral grip curl',ropeham:'rope curl',ccurl:'cable bar curl',spider:'prone curl'};
+const exWords=q=>String(q||'').toLowerCase().replace(/[-()',]/g,' ').split(/\s+/).filter(Boolean);
+// Best matches first: the whole phrase in the name, then every word in the name or its other names, then muscle-only matches.
+function exRank(d,q){const n=d.n.toLowerCase(),a=n+' '+(EXALIAS[d.id]||''),ws=exWords(q).map(w=>w.replace(/(es|s)$/,''));
+  return n.includes(String(q).toLowerCase().trim())?0:ws.every(w=>n.includes(w))?1:ws.every(w=>a.includes(w))?2:3}
+const exSort=(list,q)=>q?list.map(d=>[exRank(d,q),d]).sort((x,y)=>x[0]-y[0]||x[1].n.localeCompare(y[1].n)).map(x=>x[1]):list;
+// Every word you type must appear in the name, another name, or the muscles ("fly machine", "one arm tricep").
+function exMatch(d,q){const norm=s=>String(s||'').toLowerCase().replace(/[-()',]/g,' ');const hay=' '+norm(d.n+' '+(EXALIAS[d.id]||'')+' '+Object.keys(d.m).map(k=>MUSC[k]).join(' ')+' '+(d.u==='bw'?'bodyweight calisthenics':''))+' ';
+  return exWords(q).every(w=>{const ws=[w,w.replace(/(es|s)$/,''),w==='flies'?'fly':w,w==='tricep'?'triceps':w,w==='bicep'?'biceps':w,w==='db'?'dumbbell':w,w==='dumbbell'?'db':w,w==='bb'?'barbell':w];return ws.some(x=>x&&hay.includes(x))})}
 const NOTES={ohtri:'Trains the long head of the triceps in a stretch, the biggest part of your arm.',inccurl:'Long-head biceps in a stretch. Go lighter than standing curls.',legext:'Last set: drop the weight 30% at failure and keep going.',dbcurl:'Superset A with skullcrushers, 60 s between.',skull:'Superset A.',bayes:'Superset B with one-arm pushdowns.',pd1:'Superset B.',hack:'Pendulum or barbell squat also fine. First big lift, freshest legs.'};
 const P=(id,name,dow,focus,ex)=>({id,name,dow,focus,ex:ex.map(([x,s])=>({x,s}))});
 const DEFAULT_PROGRAM=[
@@ -734,7 +820,7 @@ function swapList(ctx){
   let cur=null;if(ctx.mode==='active')cur=def(S.active.list[ctx.x].id);if(ctx.mode==='plan')cur=def(S.program.find(d=>d.id===ctx.day).ex[ctx.x].x);
   const pm=cur?primary(cur):null;
   const all=Object.keys({...LIB,...S.customEx}).map(def).filter(d=>!cur||d.id!==cur.id);
-  const match=all.filter(d=>q?d.n.toLowerCase().includes(q):pm?primary(d)===pm:true);
+  const match=exSort(all.filter(d=>q?exMatch(d,q):pm?primary(d)===pm:true),q);
   const rest=q||!pm?[]:all.filter(d=>primary(d)!==pm);
   // Your recent swaps first: the machines you actually reach for.
   const rec=q?[]:(S.swapRecent||[]).filter(id=>(LIB[id]||S.customEx[id])&&(!cur||id!==cur.id)).slice(0,5).map(def),recI=new Set(rec.map(d=>d.id));
@@ -743,7 +829,7 @@ function swapList(ctx){
 }
 // Exercise library results: redrawn on their own while you type, so the search box keeps its keyboard.
 function libRes(){const q=(UI.libQ||'').toLowerCase(),mf=UI.libM||'',recs=records();
-  const all=Object.keys({...LIB,...S.customEx}).map(def).filter(d=>q?d.n.toLowerCase().includes(q):!mf||primary(d)===mf).sort((a,b)=>(recs[b.id]?1:0)-(recs[a.id]?1:0)||a.n.localeCompare(b.n));
+  const all0=Object.keys({...LIB,...S.customEx}).map(def).filter(d=>q?exMatch(d,q):!mf||primary(d)===mf),all=q?exSort(all0,q):all0.sort((a,b)=>(recs[b.id]?1:0)-(recs[a.id]?1:0)||a.n.localeCompare(b.n));
   return `${q?'':`<div class="row wrap" style="gap:6px"><button class="chip${!mf?' on':''}" data-a="libm" data-m="">All</button>${Object.entries(MUSC).map(([k,v])=>`<button class="chip${mf===k?' on':''}" data-a="libm" data-m="${k}">${v}</button>`).join('')}</div>`}
     <div>${all.map(d=>{const r=recs[d.id];return `<button class="food" data-a="exinfo" data-id="${d.id}"><div class="figbox" style="width:56px">${exMedia(d.id)}</div><div class="grow"><b>${esc(d.n)}</b><p class="small muted">${Object.keys(d.m).map(k=>MUSC[k]).join(', ')}</p></div>${r?`<span class="small muted" style="text-align:right">best<br><b class="num" style="font-size:15px">${r.kg}×${r.r}</b></span>`:''}</button>`}).join('')||'<p class="small muted">No matches.</p>'}</div>`}
 function sheetHTML(){
@@ -790,7 +876,15 @@ function sheetHTML(){
      <p class="tiny muted" style="margin-top:6px">Changing kcal scales carbs and fat with it.</p></details>
     <div class="grid2"><button class="btn" data-a="delfood" style="color:var(--bad)">Remove</button><button class="btn primary" data-a="closesheet">Close</button></div>`}
   if(s.kind==='phcred'){body=`<h2>Photo credits</h2><p class="small muted">Skill photos from Wikimedia Commons, used under their licences.</p><div class="stack" style="gap:6px">${PHCRED.map(([f,by,lic,u])=>`<p class="small"><a href="${u}" target="_blank" rel="noopener">${esc(f)}</a> · ${esc(by||'unknown')} · ${esc(lic)}</p>`).join('')}</div>`}
-  if(s.kind==='exopt'){const x=S.active&&S.active.list[s.x];if(!x){UI.sheet=null;return ''}const d=def(x.id);body=`<h2>${esc(d.n)}</h2>
+  if(s.kind==='exopt'){const x=S.active&&S.active.list[s.x];if(!x){UI.sheet=null;return ''}const d=def(x.id),L2=S.active.list;body=`<h2>${esc(d.n)}</h2>
+   <div class="card flat stack" style="padding:10px 12px;gap:6px"><div class="row between"><p class="label">Sets</p><span class="tiny muted">edit any set, done or not</span></div>
+    <div class="setrow small muted"><span></span><span style="text-align:center">${unitLabel(d.u)}</span><span style="text-align:center">reps</span><span></span></div>
+    ${x.sets.map((z,i)=>`<div class="setrow"><button class="icon-btn s" data-a="exsetrm" data-i="${i}" ${x.sets.length<2?'disabled':''} aria-label="Remove set ${i+1}" title="Remove set ${i+1}">${x.sets.length<2?i+1:I.x}</button>
+     <input class="num" type="number" inputmode="decimal" step="0.5" value="${z.kg}" data-c="setkg" data-x="${s.x}" data-i="${i}" aria-label="Set ${i+1} kg">
+     <input class="num" type="number" inputmode="numeric" placeholder="${d.r[0]}–${d.r[1]}" value="${z.reps}" data-c="setreps" data-x="${s.x}" data-i="${i}" aria-label="Set ${i+1} reps">
+     <button class="check${z.done?' done':''}" data-a="exsettog" data-i="${i}" aria-label="${z.done?'Mark set '+(i+1)+' not done':'Mark set '+(i+1)+' done'}">${I.check}</button></div>`).join('')}
+    <button class="btn sm ghost" data-a="exsetadd" style="align-self:flex-start">+ Add a set</button></div>
+   ${L2.length>1?`<details data-o="exoptall"><summary class="small" style="color:var(--violet);font-weight:700;padding:4px 0">Edit another exercise in this session</summary><div class="list" style="margin-top:6px">${L2.map((e,i)=>i===s.x?'':`<button class="li" data-a="exoptgo" data-x="${i}" style="width:100%;text-align:left"><span class="grow"><b class="small">${esc(def(e.id).n)}</b><br><span class="tiny muted">${e.sets.filter(z=>z.done).map(z=>(+z.kg?z.kg+'×':'')+z.reps).join(' · ')||'no sets done yet'}</span></span><span class="small muted">›</span></button>`).join('')}</div></details>`:''}
    <div class="grid2"><button class="btn" data-a="exmove" data-d="-1" ${s.x===0?'disabled':''}>Move up</button><button class="btn" data-a="exmove" data-d="1" ${s.x===S.active.list.length-1?'disabled':''}>Move down</button></div>
    <button class="btn" data-a="exinfo" data-id="${x.id}">Progress and form cues</button>
    <button class="btn" data-a="swapopen" data-mode="active" data-x="${s.x}">Swap for another exercise</button>
@@ -880,7 +974,7 @@ const ILL={incdb:'0080',mpress:'0066',dbpress:'0055',bbbench:'0042',incsm:'0081'
 // by figure group, for custom exercises and anything unmapped
 const GILL={curl:'0224',pushdown:'0206',ohext:'0193',skull:'0170',pressflat:'0042',pressinc:'0043',fly:'0048',raise:'0018',ohpress:'0004',row:'0025',pulldown:'0093',
  pullup:'0087',dip:'0054',squat:'0122',lunge:'0132',hinge:'0118',legext:'0142',legcurl:'0119',calf:'0282',crunch:'0288',situp:'0291',facepull:'0035',
- pushup:'0077',plank:'p:plank',hangraise:'p:hkr',hollow:'p:hollow'};
+ pushup:'0077',plank:'p:plank',hangraise:'p:hkr',hollow:'p:hollow',shrug:'0024',carry:'0024',twist:'0288'};
 const BWILL={pushup:'0077',pullup:'0087',dip:'0054',hangraise:'p:hkr',plank:'p:plank',squat:'p:squat',situp:'0291',lunge:'p:lunge',crunch:'0291',hollow:'p:hollow'};
 const STILL={'Diamond push-ups':'0188','Chin-ups, slow down':'0090','Chin-up hold at the top':'0090','Bench dips':'0162','Hanging knee raises':'p:hkr','Pike push-ups':'p:pike','Burpees':'p:burpee','Hollow hold':'p:hollow'};
 // Skills use the drawn pictograms in poses.js (POSEPH left empty; f:/c: photo keys still supported).
@@ -1293,7 +1387,10 @@ function applySwap(id){const s=UI.sheet;const d=def(id);
   // Each exercise in a session remembers its place in the plan (pi), so "Also save to plan" still finds it after an earlier today-only swap.
   if(s.mode==='active'){const x=S.active.list[s.x];S.active.list[s.x]={id,sets:newSets(d,x.sets.length),...(x.pi!=null?{pi:x.pi}:{})};S.active.edited=true;
     if(pd){const pe=x.pi!=null&&pd.ex[x.pi]?pd.ex[x.pi]:pd.ex.find(e=>e.x===x.id);if(pe){pe.x=id;kept=true}}}
-  if(s.mode==='activeadd'){const pi=pd?pd.ex.push({x:id,s:2})-1:null;S.active.list.push({id,sets:newSets(d,2),...(pi!=null?{pi}:{})});S.active.edited=true;if(pd)kept=true}
+  // From one-set mode (s.x = the exercise on screen) the new one goes in just before it and becomes the one on screen.
+  if(s.mode==='activeadd'){const L2=S.active.list,at=Number.isInteger(s.x)&&s.x>=0&&s.x<L2.length?s.x:L2.length;let pi=null;
+    if(pd){const cp=at<L2.length?L2[at].pi:null;if(cp!=null&&pd.ex[cp]){pd.ex.splice(cp,0,{x:id,s:2});pi=cp;L2.forEach(e=>{if(e.pi!=null&&e.pi>=cp)e.pi++})}else pi=pd.ex.push({x:id,s:2})-1;kept=true}
+    L2.splice(at,0,{id,sets:newSets(d,2),...(pi!=null?{pi}:{})});if(at<L2.length-1)UI.fx=at;S.active.edited=true}
   if(s.mode==='plan'){S.program.find(p=>p.id===s.day).ex[s.x].x=id}
   if(s.mode==='planadd'){S.program.find(p=>p.id===s.day).ex.push({x:id,s:2})}
   S.swapRecent=[id,...(S.swapRecent||[]).filter(x=>x!==id)].slice(0,8);UI.swapKeep=false;
@@ -1381,7 +1478,14 @@ const A={
  addset:t=>{const x=S.active.list[+t.dataset.x];const l=x.sets[x.sets.length-1]||{kg:''};x.sets.push({kg:l.kg,reps:'',done:false});S.active.edited=true;save();render()},
  rmset:t=>{const x=S.active.list[+t.dataset.x];if(!x||x.sets.length<2)return;let i=x.sets.map(s=>!s.done).lastIndexOf(true);if(i<0)i=x.sets.length-1;
    const v=x.sets.splice(i,1)[0];S.active.edited=true;save();render();toast((v.done?'Removed done set ':'Removed set ')+(i+1),()=>{if(!S.active)return;x.sets.splice(Math.min(i,x.sets.length),0,v);save();render()})},
- exopt:t=>{UI.sheet={kind:'exopt',x:+t.dataset.x};renderSheet()},
+ exopt:t=>{UI.sheet={kind:'exopt',x:+t.dataset.x,id:'x'+t.dataset.x};renderSheet()},
+ // Set editor inside the exercise options sheet (works from one-set mode too).
+ exoptgo:t=>{UI.sheet={kind:'exopt',x:+t.dataset.x,id:'x'+t.dataset.x};renderSheet()},
+ exsettog:t=>{const x=S.active.list[UI.sheet.x],s=x&&x.sets[+t.dataset.i];if(!s)return;const row=t.closest('.setrow'),r=row&&row.querySelectorAll('input')[1];if(r)s.reps=r.value;
+   if(!s.done&&s.reps==='')return toast('Enter reps first');s.done=!s.done;S.active.edited=true;save();render()},
+ exsetadd:()=>{const x=S.active.list[UI.sheet.x];if(!x)return;const l=x.sets[x.sets.length-1]||{kg:''};x.sets.push({kg:l.kg,reps:'',done:false});S.active.edited=true;save();render()},
+ exsetrm:t=>{const x=S.active.list[UI.sheet.x],i=+t.dataset.i;if(!x||x.sets.length<2)return;const v=x.sets.splice(i,1)[0];S.active.edited=true;save();render();
+   toast('Set '+(i+1)+' removed',()=>{if(!S.active)return;x.sets.splice(Math.min(i,x.sets.length),0,v);save();render()})},
  exmove:t=>{const l=S.active.list,i=UI.sheet.x,j=i+(+t.dataset.d);if(j<0||j>=l.length)return;[l[i],l[j]]=[l[j],l[i]];S.active.edited=true;UI.sheet=null;save();render()},
  exremove:()=>{const i=UI.sheet.x,x=S.active.list.splice(i,1)[0];S.active.edited=true;UI.sheet=null;save();render();
    toast('Removed '+def(x.id).n,()=>{if(!S.active)return;S.active.list.splice(Math.min(i,S.active.list.length),0,x);UI.fx=i;save();render()})},
@@ -1534,6 +1638,6 @@ function checkDay(){const d=ymd(new Date());if(d!==TODAY){TODAY=d;if(!document.q
 document.addEventListener('visibilitychange',()=>{if(!document.hidden){checkDay();if((UI.run&&UI.run.phase!=='done')||UI.ht)keepAwake(true)}});addEventListener('focus',checkDay);setInterval(checkDay,60000);
 try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(_){}
 </script>
-<script src="native.js?v=7"></script>
-<script src="ui-core.js?v=6"></script>
-<script src="ui-more.js?v=6"></script>
+<script src="native.js?v=8"></script>
+<script src="ui-core.js?v=7"></script>
+<script src="ui-more.js?v=7"></script>

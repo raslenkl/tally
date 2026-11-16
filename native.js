@@ -43,7 +43,9 @@ async function gemModels(key,force){const c=aic(),tag=key.slice(-6);
     if(gm.length){setAic({gm,gmAt:Date.now(),gmKey:tag});return gm}}
   catch(e){if([400,401,403].includes(+e.status))throw e}
   return c.gm&&c.gm.length?c.gm:GEM_SEED}
-async function gemCall(model,prompt,b64,key){const parts=[{text:prompt}];if(b64)parts.push({inline_data:{mime_type:'image/jpeg',data:b64}});
+// b64: one photo, a list of photos (a meal shot from several angles), or nothing.
+const imgsOf=b64=>[].concat(b64||[]).filter(Boolean);
+async function gemCall(model,prompt,b64,key){const parts=[{text:prompt}];imgsOf(b64).forEach(d=>parts.push({inline_data:{mime_type:'image/jpeg',data:d}}));
   const r=await withT(fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,{method:'POST',
     headers:{'Content-Type':'application/json','x-goog-api-key':key},body:JSON.stringify({contents:[{parts}],generationConfig:{responseMimeType:'application/json',temperature:0.2}})}),40000);
   const j=await r.json().catch(()=>({}));if(!r.ok)throw aiErr((j.error&&j.error.message)||('Gemini error '+r.status),r.status);
@@ -56,7 +58,7 @@ async function orModels(vision){const c=aic(),k=vision?'orv':'ort';if(c[k]&&c[k]
     setAic({orv,ort,orAt:Date.now()});return vision?orv:ort}catch(_){return c[k]||[]}}
 async function orCall(model,prompt,b64,key){
   const r=await withT(fetch('https://openrouter.ai/api/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+key},
-    body:JSON.stringify({model,temperature:0.2,messages:[{role:'user',content:b64?[{type:'text',text:prompt},{type:'image_url',image_url:{url:'data:image/jpeg;base64,'+b64}}]:prompt}]})}),60000);
+    body:JSON.stringify({model,temperature:0.2,messages:[{role:'user',content:imgsOf(b64).length?[{type:'text',text:prompt},...imgsOf(b64).map(d=>({type:'image_url',image_url:{url:'data:image/jpeg;base64,'+d}}))]:prompt}]})}),60000);
   const j=await r.json().catch(()=>({}));if(!r.ok||j.error)throw aiErr((j.error&&j.error.message)||('OpenRouter error '+r.status),(j.error&&+j.error.code)||r.status);
   const t=j.choices&&j.choices[0]&&j.choices[0].message&&j.choices[0].message.content;if(!t)throw aiErr('empty answer',204);
   return typeof t==='string'?t:t.map(p=>p.text||'').join('')}
@@ -104,16 +106,29 @@ const gemini=ai;
 
 const who=()=>{const a=ageOn(TODAY),f=S.profile.sex==='f';return a<30?(f?'a young woman':'a young man'):(f?'a woman':'a man')};
 const where=()=>S.profile.loc==='XX'?(S.profile.region||'their country'):S.profile.loc==='MY'?'Malaysia (mamak, nasi lemak, chicken rice, roti canai, food courts)':'Tunisia (home cooking: couscous, tajine, ojja, lablabi, brik, makloub, baguette, harissa, olive oil)';
-async function foodAI(desc,b64){
-  const j=await gemini(`You estimate nutrition for a meal logged by ${who()} who lives in ${where()}.
+// Things the user told the AI once and asked it to keep in mind ("my plates are small", "mum uses little oil").
+// Meal photos waiting to be estimated (UI.snaps = [{url,b64}]): several angles or parts of one meal.
+const SNAP_MAX=4;
+const snapsB64=()=>{const s=UI.snaps||[];return s.length?s.map(x=>x.b64):null};
+function clearSnaps(){(UI.snaps||[]).forEach(x=>URL.revokeObjectURL(x.url));UI.snaps=[]}
+function addSnap(url,b64){UI.snaps=[...(UI.snaps||[]),{url,b64}];while(UI.snaps.length>SNAP_MAX)URL.revokeObjectURL(UI.snaps.shift().url)}
+window.addSnap=addSnap;
+const aiMem=()=>(Array.isArray(S.aiMem)?S.aiMem:[]).filter(Boolean);
+// fix = {prev:[items], msgs:[what the user said was wrong, oldest first]} when re-estimating after feedback.
+async function foodAI(desc,b64,fix){const mem=aiMem(),fx=fix&&fix.prev&&fix.msgs&&fix.msgs.length;
+  const j=await gemini(`You estimate nutrition for a meal logged by ${who()} who lives in ${where()}. The numbers go into a calorie log for a body recomposition, so accuracy matters more than speed.
 Meal description: "${desc||'(see photo)'}".
-${b64?'A photo of the meal is attached. Judge portion sizes from plates, cutlery and hands.':''}
-Split it into items. Be realistic about home-cooking oil and sauces; don't lowball. Typical restaurant portions unless the text says otherwise.
-Return JSON only: {"items":[{"n":"short name with amount, e.g. 'Couscous with lamb, 1 plate'","g":grams,"k":kcal,"pr":protein_g,"c":carbs_g,"f":fat_g,"fi":fiber_g}],"note":"one short sentence on what was hardest to judge"}`,b64);
+${imgsOf(b64).length>1?imgsOf(b64).length+' photos of the same meal are attached (different angles, parts of the meal, or a label). Combine them into one estimate and do not count the same food twice. Judge portion sizes from plates, cutlery and hands.':b64?'A photo of the meal is attached. Judge portion sizes from plates, cutlery and hands.':''}
+${mem.length?'Facts this user told you earlier about how they eat (trust them):\n'+mem.map(m=>'- '+m).join('\n'):''}
+Method: 1) name each component, 2) estimate its cooked weight in grams, 3) apply typical kcal and macros per 100 g for that food as cooked, 4) add cooking oil, butter, sauces and dressings as their own items when they are likely. Be realistic about home-cooking oil; don't lowball. Typical portions unless the text says otherwise.
+${fx?`Your previous estimate was:\n${fix.prev.map(i=>`- ${i.n}: ${i.g?Math.round(i.g)+' g, ':''}${Math.round(i.k)} kcal, ${Math.round(i.pr)} g protein`).join('\n')}
+The user says it is wrong:\n${fix.msgs.map(m=>'- "'+m+'"').join('\n')}
+Redo the whole estimate using this. Facts the user states (amounts, ingredients, how it was cooked, brand) override your guesses. Keep items they did not question unless their correction affects them.`:''}
+Return JSON only: {"items":[{"n":"short name with amount, e.g. 'Couscous with lamb, 1 plate'","g":grams,"k":kcal,"pr":protein_g,"c":carbs_g,"f":fat_g,"fi":fiber_g,"why":"max 12 words: the amount you assumed and the main assumption"}],"note":"one short sentence on what was hardest to judge${fx?', or what you changed':''}"}`,b64);
   // Models sometimes answer "350 kcal" as text, or leave kcal empty but give the macros. Read both; drop anything absurd.
   const num=v=>{if(typeof v==='number')return v;const m=String(v==null?'':v).replace(',','.').match(/\d+(?:\.\d+)?/);return m?+m[0]:NaN};
   const items=(Array.isArray(j.items)?j.items:[]).filter(i=>i&&i.n).map(i=>{const pr=Math.max(0,num(i.pr)||0),c=Math.max(0,num(i.c)||0),f=Math.max(0,num(i.f)||0);
-      let k=num(i.k);if(!(k>=0))k=pr||c||f?pr*4+c*4+f*9:NaN;return {n:String(i.n).slice(0,80),g:num(i.g)>0?num(i.g):null,k,pr,c,f,fi:Math.max(0,num(i.fi)||0)}})
+      let k=num(i.k);if(!(k>=0))k=pr||c||f?pr*4+c*4+f*9:NaN;return {n:String(i.n).slice(0,80),g:num(i.g)>0?num(i.g):null,k,pr,c,f,fi:Math.max(0,num(i.fi)||0),why:String(i.why||'').slice(0,120)}})
     .filter(i=>isFinite(i.k)&&i.k>=0&&i.k<=5000);
   if(!items.length)throw new Error('Could not read any food from that');
   return {items,note:j.note||''}}
@@ -155,18 +170,26 @@ async function dbSearch(q){const [a,b]=await Promise.allSettled([fdcSearch(q),of
 const X={};X.native=NATIVE;X.dbSearch=dbSearch;
 // The in-app camera where the phone has one (ui-more.js), the phone's own camera app on iPhone.
 const live=()=>typeof liveCam==='function'&&liveCam();
-X.snapCard=()=>{const g=gem(),st=UI.ai||{},ph=UI.snap;
-  return `<div class="row wrap" style="gap:10px;align-items:center">
-    ${ph?`<img class="snapph" src="${ph.url}" alt="Meal photo"><button class="btn sm ghost" data-a="snapclear">Remove photo</button>${live()?`<button class="btn sm ghost" data-a="camopen" data-mode="meal">Retake</button>`:''}`
-     :live()?`<button class="btn sm" data-a="camopen" data-mode="meal">${'+ Photo'}</button><label class="btn sm ghost" style="text-align:center">Gallery<input type="file" accept="image/*" data-c="snapph" hidden></label><span class="small muted grow">optional, best with a few words</span>`
-     :`<label class="btn sm" style="text-align:center">+ Photo<input type="file" accept="image/*" capture="environment" data-c="snapph" hidden></label><span class="small muted grow">optional, works best with a few words</span>`}</div>
-   ${hasAI()?`<button class="btn cta block" data-a="aifood" ${st.busy?'disabled':''}>${st.busy?'Estimating…':'Estimate'+(ph&&UI.desc.trim()?' photo + text':ph?' photo':'')}</button>`
+X.snapCard=()=>{const g=gem(),st=UI.ai||{},ps=UI.snaps||[],n=ps.length,ph=n>0,more=n<SNAP_MAX,pw=n>1?'photos':'photo';
+  return `${ph?`<div class="row wrap" style="gap:8px">${ps.map((p,i)=>`<div style="position:relative"><img class="snapph" src="${p.url}" alt="Meal photo ${i+1}"><button class="icon-btn s" data-a="snaprm" data-i="${i}" aria-label="Remove photo ${i+1}" style="position:absolute;top:-6px;right:-6px">${I.x}</button></div>`).join('')}</div>`:''}
+   <div class="row wrap" style="gap:10px;align-items:center">
+    ${!more?`<span class="small muted grow">${SNAP_MAX} photos is the most per meal</span>`
+     :live()?`<button class="btn sm" data-a="camopen" data-mode="meal">${ph?'+ Another photo':'+ Photo'}</button><label class="btn sm ghost" style="text-align:center">Gallery<input type="file" accept="image/*" multiple data-c="snapph" hidden></label><span class="small muted grow">${ph?'other angles, the side dish, a label':'optional, best with a few words'}</span>`
+     :`<label class="btn sm" style="text-align:center">${ph?'+ Another photo':'+ Photo'}<input type="file" accept="image/*" multiple data-c="snapph" hidden></label><span class="small muted grow">${ph?'other angles, the side dish, a label':'optional, works best with a few words'}</span>`}</div>
+   ${hasAI()?`<button class="btn cta block" data-a="aifood" ${st.busy?'disabled':''}>${st.busy?'Estimating…':'Estimate'+(ph&&UI.desc.trim()?' '+pw+' + text':ph?' '+(n>1?n+' photos':'photo'):'')}</button>`
     :`<p class="small muted">Add a free AI key in Settings to estimate from photos and any description. Until then, the quick match below works offline.</p><button class="btn sm" data-a="settings" style="align-self:flex-start">Open Settings</button>`}
    ${st.err?`<p class="small" style="color:var(--bad)">${esc(st.err)}</p>${st.quota?`<div class="row wrap">${parseMeal(UI.desc||'').length?'<button class="btn sm primary" data-a="adddesc">Use the quick match</button>':''}<button class="btn sm" data-a="customfood">Type the numbers</button><button class="btn sm ghost" data-a="settings">Settings</button></div>`:''}`:''}
-   ${st.items?`<div class="card raise stack" style="padding:10px 12px"><div class="list">${st.items.map((i,k)=>`<div class="li"><div class="grow"><b class="small">${esc(i.n)}</b><p class="small muted">${Math.round(i.pr)} P · ${Math.round(i.c)} C · ${Math.round(i.f)} F</p></div>
+   ${st.items?`<div class="card raise stack" style="padding:10px 12px"><div class="list">${st.items.map((i,k)=>`<div class="li"><div class="grow"><b class="small">${esc(i.n)}</b><p class="small muted">${i.g?Math.round(i.g)+' g · ':''}${Math.round(i.pr)} P · ${Math.round(i.c)} C · ${Math.round(i.f)} F</p>${i.why?`<p class="tiny muted">${esc(i.why)}</p>`:''}</div>
      <input class="num" type="number" inputmode="numeric" value="${Math.round(i.k)}" data-c="aik" data-i="${k}" aria-label="kcal for ${esc(i.n)}" style="width:76px;font-size:16px;padding:4px"><button class="icon-btn s" data-a="aidel" data-i="${k}" aria-label="Remove ${esc(i.n)}">${I.x}</button></div>`).join('')}</div>
      ${st.note?`<p class="small muted">${esc(st.note)}</p>`:''}
-     <p class="small muted">Fix any kcal that looks off; protein, carbs and fat scale with it. Next time it's one tap under Again.</p>
+     ${st.fixes&&st.fixes.length?`<p class="tiny muted">Re-estimated after: ${st.fixes.map(m=>'“'+esc(m)+'”').join(', ')}</p>`:''}
+     <details data-o="aifix"${st.fixErr?' open':''}><summary class="small" style="color:var(--violet);font-weight:700;padding:4px 0">Looks wrong? Tell the AI why</summary>
+      <div class="stack" style="gap:8px;margin-top:6px">
+       <textarea id="aiFix" rows="2" placeholder="e.g. it was half a plate · no oil, grilled · 2 eggs not 3 · the bread was a small piece"></textarea>
+       <label class="row small" style="gap:8px;cursor:pointer"><input id="aiMemOn" type="checkbox" style="width:18px;height:18px"><span class="grow">Remember this for future meals <span class="muted">(only for facts that are always true)</span></span></label>
+       ${st.fixErr?`<p class="small" style="color:var(--bad)">${esc(st.fixErr)}</p>`:''}
+       <button class="btn block" data-a="aifix" ${st.fixing?'disabled':''}>${st.fixing?'Re-estimating…':'Re-estimate with this'}</button></div></details>
+     <p class="small muted">Or fix any kcal yourself; protein, carbs and fat scale with it. Next time it's one tap under Again.</p>
      <button class="btn primary block" data-a="aiadd">Add ${st.items.length} items · ${fmt(st.items.reduce((a,i)=>a+i.k,0))} kcal</button></div>`:''}`};
 X.offCard=()=>{const o=UI.off||{},nScan=S.myFoods.filter(f=>f.code).length;return `<div class="card flat stack" style="padding:12px"><p class="small"><b>Packaged food</b> <span class="small muted">barcode · Open Food Facts + your own scans</span></p>
    ${NATIVE&&BS?`<button class="btn primary block" data-a="livescan" ${o.busy?'disabled':''}>${o.busy?'Looking up…':'Scan a barcode'}</button>`
@@ -294,6 +317,9 @@ X.setAI=()=>{const g=gem(),T=UI.gemT||{},c=aic(),q=(S.aiq||[]).length;return `
     ${keyField('orKey','orkey','OpenRouter','openrouter.ai/keys → Create key. No credit needed.',g.or,'Paste OpenRouter key',T.o)}
     ${hasAI()?`<button class="btn ${T.run?'':'primary'} block" data-a="gemtest" ${T.run?'disabled':''}>${T.run?'Testing… <span id="aitT">'+Math.round((Date.now()-T.t0)/1000)+' s</span>':T.secs!=null?'Test again':'Test the keys'}</button>`
      :'<p class="small muted">Paste at least one key to turn on estimates.</p>'}</div>
+   <div class="card stack" style="gap:8px"><p class="small"><b>What the AI remembers about your food</b></p>
+    ${aiMem().length?`<div class="list">${aiMem().map((m,i)=>`<div class="li"><span class="grow small">${esc(m)}</span><button class="icon-btn s" data-a="aimemdel" data-i="${i}" aria-label="Forget this">${I.x}</button></div>`).join('')}</div>`
+     :'<p class="small muted">Nothing yet. After an estimate, open "Looks wrong? Tell the AI why" and tick "Remember this" to add a fact here.</p>'}</div>
    ${q||UI.aiUsed||(c.gm&&c.gm.length)?`<p class="tiny muted">${c.gm&&c.gm.length?c.gm.length+' Gemini models available to your key. ':''}${UI.aiUsed?'Last answer: '+esc(UI.aiUsed)+'. ':''}${q?q+' meal'+(q>1?'s':'')+' waiting for an estimate.':''}</p>`:''}
    <details class="card"><summary class="small" style="font-weight:700">Advanced</summary><div class="stack" style="margin-top:10px">
     <div class="field"><label class="label" for="gemModel">Preferred Gemini model</label><input id="gemModel" value="${esc(g.model||'')}" placeholder="automatic: newest free Flash" autocapitalize="off" spellcheck="false" data-c="gemmodel"></div>
@@ -436,14 +462,23 @@ X.savePhoto=async(id,blob)=>{if(!NATIVE||!FS)return;try{const b64=await new Prom
 
 /* ---------- Actions ---------- */
 Object.assign(A,{
- aifood:async()=>{const d=UI.desc.trim(),ph=UI.snap;if(!d&&!ph)return toast('Add a photo or a few words first');UI.ai={busy:true};render();
-   try{UI.ai=await foodAI(d,ph&&ph.b64);queueKick(2000)}
-   catch(e){if(e.retry){queueMeal(d,ph&&ph.b64);UI.ai={};UI.desc='';if(ph){URL.revokeObjectURL(ph.url);UI.snap=null}if(UI.sheet&&UI.sheet.kind==='describe')UI.sheet=null;render();
+ aifood:async()=>{const d=UI.desc.trim(),ph=snapsB64();if(!d&&!ph)return toast('Add a photo or a few words first');UI.ai={busy:true};render();
+   try{UI.ai=await foodAI(d,ph);queueKick(2000)}
+   catch(e){if(e.retry){queueMeal(d,ph);UI.ai={};UI.desc='';clearSnaps();if(UI.sheet&&UI.sheet.kind==='describe')UI.sheet=null;render();
        toast(e.offline?'No connection. Saved: it gets estimated when you are back online.':'The AI is busy. Saved: the numbers fill in by themselves shortly.');return}
      UI.ai={err:e.message,quota:!!e.quota}}render()},
- snapclear:()=>{if(UI.snap)URL.revokeObjectURL(UI.snap.url);UI.snap=null;render()},
+ // Feedback on an estimate: the AI redoes it with what you said, and can remember lasting facts for next time.
+ aifix:async()=>{const st=UI.ai;if(!st||!st.items)return;const el=$('#aiFix'),msg=((el&&el.value)||'').trim().slice(0,300),keep=!!($('#aiMemOn')||{}).checked;
+   if(!msg)return toast('Say what looks wrong first');const ph=snapsB64(),fixes=[...(st.fixes||[]),msg];
+   if(keep){S.aiMem=[...aiMem().filter(m=>m!==msg),msg].slice(-25);save()}
+   UI.ai={...st,fixing:true,fixErr:null};render();
+   try{const r=await foodAI(UI.desc.trim(),ph,{prev:st.items,msgs:fixes});UI.ai={...r,fixes};toast(keep?'Re-estimated · remembered for next time':'Re-estimated')}
+   catch(e){UI.ai={...st,fixing:false,fixErr:e.retry?'The AI is busy right now. Try again in a minute, or fix the kcal yourself.':e.message}}render()},
+ aimemdel:t=>{const m=aiMem();m.splice(+t.dataset.i,1);S.aiMem=m;save();renderSheet()},
+ snapclear:()=>{clearSnaps();render()},
+ snaprm:t=>{const s=UI.snaps||[],p=s.splice(+t.dataset.i,1)[0];if(p)URL.revokeObjectURL(p.url);render()},
  aidel:t=>{UI.ai.items.splice(+t.dataset.i,1);if(!UI.ai.items.length)UI.ai={};render()},
- aiadd:t=>{const tot=UI.ai.items.reduce((a,i)=>a+i.k,0);if(bigAsk(tot,()=>A.aiadd({dataset:{ok:1}}),t))return;const g=Date.now().toString(36);UI.ai.items.forEach(i=>pushFood({n:i.n,k:Math.round(i.k),pr:Math.round(i.pr),c:Math.round(i.c),f:Math.round(i.f),fi:Math.round(i.fi||0),x:1,src:'ai',g,...(i.g?{pg:i.g}:{})}));const n=UI.ai.items.length;UI.ai={};UI.desc='';if(UI.snap){URL.revokeObjectURL(UI.snap.url);UI.snap=null}save();render();toast(n+' items added')},
+ aiadd:t=>{const tot=UI.ai.items.reduce((a,i)=>a+i.k,0);if(bigAsk(tot,()=>A.aiadd({dataset:{ok:1}}),t))return;const g=Date.now().toString(36);UI.ai.items.forEach(i=>pushFood({n:i.n,k:Math.round(i.k),pr:Math.round(i.pr),c:Math.round(i.c),f:Math.round(i.f),fi:Math.round(i.fi||0),x:1,src:'ai',g,...(i.g?{pg:i.g}:{})}));const n=UI.ai.items.length;UI.ai={};UI.desc='';clearSnaps();save();render();toast(n+' items added')},
  offgo:()=>{const c=($('#offCode').value||'').replace(/\D/g,'');if(c.length<8)return toast('Enter the full barcode');offFind(c)},
  offadd:t=>{const p=UI.off.p,g=parseFloat($('#offG').value);if(!(g>0))return toast('Enter grams');const x=g/100;if(bigAsk(p.k*x,()=>A.offadd({dataset:{ok:1}}),t))return;rememberScan(UI.off.code,p,g);
    pushFood({n:p.n+' ('+g+' g)',k:p.k*x,pr:p.pr*x,c:p.c*x,f:p.f*x,fi:(p.fi||0)*x,x:1,src:'off'});UI.off={};save();render();toast('Added')},
@@ -471,7 +506,9 @@ document.addEventListener('change',async e=>{const t=e.target,c=t.dataset.c;if(!
   if(c==='ntime'&&t.value){S.profile.notif={...nset(),[t.dataset.k]:t.value};save()}
   if(c==='ntog'){S.profile.notif={...nset(),[t.dataset.k]:t.checked};save();renderSheet()}
   if(c==='aik')render();
-  if(c==='snapph'&&t.files[0]){const f=t.files[0];if(UI.cam&&A.camclose)A.camclose();try{if(UI.snap)URL.revokeObjectURL(UI.snap.url);UI.snap={url:URL.createObjectURL(f),b64:await fileToJpeg(f)};UI.ai={};if(!UI.sheet)UI.sheet={kind:'describe'}}catch(er){toast('Could not read that photo')}render()}
+  if(c==='snapph'&&t.files[0]){const fs=[...t.files];if(UI.cam&&A.camclose)A.camclose();
+    for(const f of fs){if((UI.snaps||[]).length>=SNAP_MAX){toast(SNAP_MAX+' photos is the most per meal');break}try{addSnap(URL.createObjectURL(f),await fileToJpeg(f))}catch(er){toast('Could not read that photo')}}
+    UI.ai={};if(!UI.sheet)UI.sheet={kind:'describe'};render()}
   if(c==='bfaiph'&&t.files[0]){if(UI.cam&&A.camclose)A.camclose();try{X.bfRun(await fileToJpeg(t.files[0]))}catch(er){toast('Could not read that photo')}}
   if(c==='offscan'&&t.files[0]){try{offFind(await scanImage(t.files[0]))}catch(er){UI.off={err:er.message};render()}}});
 // An item the AI gave 0 kcal can still be set: there is just nothing to scale the macros from.

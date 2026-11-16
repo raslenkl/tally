@@ -342,7 +342,7 @@ function vFocus(){
      <div class="grow stack" style="gap:7px"><p class="label">${xi+1} of ${n} · rest ${Math.round(d.rest/60*2)/2} min</p><h2 class="${nameCls(d.n)}">${esc(d.n)}</h2>
       <div class="fdots">${x.sets.map((z,i)=>`<button data-a="fsetpick" data-i="${i}" ${z.done?'':'disabled'} aria-label="${z.done?'Fix set '+(i+1)+': '+(+z.kg?z.kg+' kg × ':'')+z.reps:'Set '+(i+1)+', not done yet'}"><i class="${z.done?'ok':i===si&&!exDone?'cur':''}"></i></button>`).join('')}</div>
       <p class="small muted">${exDone?'All '+x.sets.length+' sets done':'Set '+(si+1)+' of '+x.sets.length+' · '+d.r[0]+'–'+d.r[1]+' reps'}${x.sets.some(z=>z.done)&&!exDone?' · tap a green dash to fix it':''}</p></div>
-     <button class="icon-btn s" data-a="exopt" data-x="${xi}" aria-label="Options for ${esc(d.n)}">${ic('dots')}</button></div>
+     <button class="btn sm ghost" data-a="exopt" data-x="${xi}" aria-label="Edit sets and options for ${esc(d.n)}" style="align-self:flex-start;padding:6px 10px">Edit</button></div>
     <p class="hint">${sg.txt}${NOTES[x.id]?' <span class="muted">'+NOTES[x.id]+'</span>':''}</p>
     ${exDone?`<p class="small muted">${x.sets.map(z=>(+z.kg?z.kg+' × ':'')+z.reps).join(' · ')}</p><div class="row"><button class="btn grow" data-a="addset" data-x="${xi}">+ One more set</button><button class="btn grow" data-a="funtick">Edit last set</button></div>`:`
     <div class="fsteps">
@@ -357,7 +357,7 @@ function vFocus(){
    </div>
    <div class="fnav"><button class="btn" data-a="fgo" data-d="-1" ${xi===0?'disabled':''}>‹ Prev</button><button class="btn" data-a="swapopen" data-mode="active" data-x="${xi}">Swap</button><button class="btn" data-a="fgo" data-d="1" ${xi===n-1?'disabled':''}>Next ›</button></div>
    ${nxt?`<p class="small muted">Up next: <b style="color:var(--ink)">${esc(def(nxt.id).n)}</b> · ${nxt.sets.length} sets</p>`:''}
-   <div class="row"><button class="btn grow ghost" data-a="swapopen" data-mode="activeadd">+ Add exercise</button><button class="btn grow ${allDone?'cta':''}" data-a="finishw">Finish workout</button></div>
+   <div class="row"><button class="btn grow ghost" data-a="swapopen" data-mode="activeadd" data-x="${xi}" aria-label="Add an exercise before ${esc(d.n)}">+ Add exercise</button><button class="btn grow ${allDone?'cta':''}" data-a="finishw">Finish workout</button></div>
   </div>`}
 function vWorkoutList(){
   const a=S.active,p=S.program.find(x=>x.id===a.day)||{name:'Workout'},all=a.list.flatMap(x=>x.sets),done=all.filter(s=>s.done).length,sl=S.sleep[TODAY];
