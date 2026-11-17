@@ -522,10 +522,10 @@ function exHistory(id){const out=[];S.log.forEach(l=>{const s=l.ex[id];if(!s||!s
 function miniChart(pts,unit){if(pts.length<2)return '<p class="small muted">The chart shows up after 2 sessions.</p>';
   const Wd=320,H=120,P=8,vs=pts.map(p=>p.v),lo=Math.min(...vs),hi=Math.max(...vs),sp=hi-lo||1;
   const xy=pts.map((p,i)=>[P+i*(Wd-2*P)/(pts.length-1),H-P-((p.v-lo)/sp)*(H-2*P-14)]);
-  const best=vs.indexOf(hi);
-  return `<svg viewBox="0 0 ${Wd} ${H}" width="100%" role="img" aria-label="Progress over ${pts.length} sessions"><path d="M${xy.map(q=>q.map(n=>n.toFixed(1)).join(' ')).join(' L')}" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round"/>
+  const best=vs.indexOf(hi),tips=pts.map((p,i)=>[+xy[i][0].toFixed(1),+xy[i][1].toFixed(1),`${fmtDate(p.d)} · ${unit==='kg'?'≈'+Math.round(p.v)+' kg 1RM':Math.round(p.v)+' '+unit}\n${(p.sets||[]).map(([kg,r])=>(kg?kg+'×':'')+r).join(', ')}`]);
+  return `<svg viewBox="0 0 ${Wd} ${H}" width="100%" role="img" aria-label="Progress over ${pts.length} sessions" data-pts="${esc(JSON.stringify(tips))}"><path d="M${xy.map(q=>q.map(n=>n.toFixed(1)).join(' ')).join(' L')}" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round"/>
    ${xy.map((q,i)=>`<circle cx="${q[0].toFixed(1)}" cy="${q[1].toFixed(1)}" r="${i===best?4.5:2.5}" fill="${i===best?'var(--accent)':'var(--muted)'}"/>`).join('')}
-   <text x="${P}" y="12" font-size="11" fill="var(--muted)">${Math.round(hi)} ${unit} best</text><text x="${Wd-P}" y="${H-1}" font-size="10" fill="var(--muted)" text-anchor="end">${fmtDate(pts[pts.length-1].d)}</text><text x="${P}" y="${H-1}" font-size="10" fill="var(--muted)">${fmtDate(pts[0].d)}</text></svg>`}
+   <text x="${P}" y="12" font-size="11" fill="var(--muted)">${Math.round(hi)} ${unit} best</text><text x="${Wd-P}" y="${H-1}" font-size="10" fill="var(--muted)" text-anchor="end">${fmtDate(pts[pts.length-1].d)}</text><text x="${P}" y="${H-1}" font-size="10" fill="var(--muted)">${fmtDate(pts[0].d)}</text></svg><p class="tiny muted">Tap a point to see that session.</p>`}
 const sortLog=()=>S.log.sort((a,b)=>a.d<b.d?-1:a.d>b.d?1:0);
 // After editing an old session: drop sets with no reps, empty exercises, and sessions left with nothing
 function cleanLog(e0){const e=e0||UI.sheet&&UI.sheet.e;if(!e)return;Object.keys(e.ex).forEach(id=>{e.ex[id]=e.ex[id].filter(z=>z[1]>0);if(!e.ex[id].length)delete e.ex[id]});
@@ -751,8 +751,8 @@ function chart(){
   const X=d=>Lp+(Wd-Lp-R)*diffDays(d0,d)/span,Y=v=>T+(H-T-B)*(hi-v)/(hi-lo);
   const st=Math.max(1,Math.ceil((hi-lo)/4)),ticks=[];for(let v=lo;v<=hi;v+=st)ticks.push(v);
   const path=s.map((x,i)=>(i?'L':'M')+X(x.d).toFixed(1)+' '+Y(x.t).toFixed(1)).join(' ');
-  const cs=S.profile.creatineStart;
-  return `<svg class="chart" viewBox="0 0 ${Wd} ${H}" role="img" aria-label="Weight trend">
+  const cs=S.profile.creatineStart,tips=s.map(x=>[+X(x.d).toFixed(1),+Y(x.kg).toFixed(1),`${fmtDate(x.d)} · ${x.kg} kg\ntrend ${x.t.toFixed(1)} kg`]);
+  return `<svg class="chart" viewBox="0 0 ${Wd} ${H}" role="img" aria-label="Weight trend" data-pts="${esc(JSON.stringify(tips))}">
    ${ticks.map(v=>`<line x1="${Lp}" x2="${Wd-R}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)"/><text x="${Lp-6}" y="${Y(v)+3}" text-anchor="end">${v}</text>`).join('')}
    ${ceil<=hi&&ceil>=lo?`<line x1="${Lp}" x2="${Wd-R}" y1="${Y(ceil)}" y2="${Y(ceil)}" stroke="var(--bad)" stroke-dasharray="4 4" stroke-width="1.5"/><text x="${Wd-R}" y="${Y(ceil)-4}" text-anchor="end" style="fill:var(--bad)">ceiling ${ceil}</text>`:''}
    ${cs&&cs>=d0?`<line x1="${X(cs)}" x2="${X(cs)}" y1="${T}" y2="${H-B}" stroke="var(--violet)" stroke-dasharray="3 3"/><text x="${X(cs)>Wd-R-60?X(cs)-4:X(cs)+4}" y="${T+8}" text-anchor="${X(cs)>Wd-R-60?'end':'start'}" style="fill:var(--violet)">creatine</text>`:''}
@@ -760,7 +760,7 @@ function chart(){
    <path d="${path}" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linejoin="round"/>
    ${s.map(x=>`<circle cx="${X(x.d)}" cy="${Y(x.kg)}" r="3" fill="var(--muted)" fill-opacity=".6"/>`).join('')}
    <circle cx="${X(s[s.length-1].d)}" cy="${Y(s[s.length-1].t)}" r="5" fill="var(--accent)" stroke="var(--surface)" stroke-width="2"/>
-   <text x="${Lp}" y="${H-6}">${fmtDate(d0)}</text><text x="${Wd-R}" y="${H-6}" text-anchor="end">${fmtDate(s[s.length-1].d)}</text></svg>`;
+   <text x="${Lp}" y="${H-6}">${fmtDate(d0)}</text><text x="${Wd-R}" y="${H-6}" text-anchor="end">${fmtDate(s[s.length-1].d)}</text></svg><p class="tiny muted">Tap or slide along the chart to read a day.</p>`;
 }
 // Waist change over roughly the last 4 weeks (reference entry 3-6 weeks before the latest one).
 function waist4w(){const wa=S.waist;if(wa.length<2)return null;const last=wa[wa.length-1];
@@ -937,8 +937,10 @@ function sheetHTML(){
     <div id="fstat">${stat3(e,e.x)}</div>
     ${mfp?'':`<div class="field"><span class="label">Meal</span><div class="seg">${['Breakfast','Lunch','Snack','Dinner'].map((n,k)=>`<button class="${sl===k?'on':''}" data-a="fslot" data-k="${k}">${n}</button>`).join('')}</div></div>`}
     <details data-o="fenum"${e.nonum?' open':''}><summary class="small" style="color:var(--violet);font-weight:700;padding:6px 0">Numbers look wrong? Set them yourself</summary>
-     <div class="grid2" style="margin-top:8px"><div class="field"><label class="label" for="feK">kcal at ×1</label><input id="feK" class="num" type="number" inputmode="numeric" value="${Math.round(e.k)}" data-c="feset" data-f="k"></div><div class="field"><label class="label" for="feP">Protein g at ×1</label><input id="feP" class="num" type="number" inputmode="numeric" value="${Math.round(e.pr)}" data-c="feset" data-f="pr"></div></div>
-     <p class="tiny muted" style="margin-top:6px">Changing kcal scales carbs and fat with it.</p></details>
+     <div class="grid2" style="margin-top:8px"><div class="field"><label class="label" for="feK">kcal at ×1</label><input id="feK" class="num" type="number" inputmode="numeric" min="0" value="${Math.round(e.k)}" data-c="feset" data-f="k"></div><div class="field"><label class="label" for="feP">Protein g at ×1</label><input id="feP" class="num" type="number" inputmode="numeric" min="0" value="${Math.round(e.pr)}" data-c="feset" data-f="pr"></div>
+      <div class="field"><label class="label" for="feC">Carbs g at ×1</label><input id="feC" class="num" type="number" inputmode="numeric" min="0" value="${Math.round(e.c)}" data-c="feset" data-f="c"></div><div class="field"><label class="label" for="feF">Fat g at ×1</label><input id="feF" class="num" type="number" inputmode="numeric" min="0" value="${Math.round(e.f)}" data-c="feset" data-f="f"></div></div>
+     <p class="tiny muted" style="margin-top:6px">Changing kcal scales carbs and fat with it. Set carbs and fat after kcal.</p></details>
+    ${UI.sheet.d!==TODAY&&!e.pend?`<button class="btn" data-a="fcopy">${ic('repeat')} Add this to today too</button>`:''}
     <div class="grid2"><button class="btn" data-a="delfood" style="color:var(--bad)">Remove</button><button class="btn primary" data-a="closesheet">Close</button></div>`}
   if(s.kind==='phcred'){body=`<h2>Photo credits</h2><p class="small muted">Skill photos from Wikimedia Commons, used under their licences.</p><div class="stack" style="gap:6px">${PHCRED.map(([f,by,lic,u])=>`<p class="small"><a href="${u}" target="_blank" rel="noopener">${esc(f)}</a> · ${esc(by||'unknown')} · ${esc(lic)}</p>`).join('')}</div>`}
   if(s.kind==='exopt'){const x=S.active&&S.active.list[s.x];if(!x){UI.sheet=null;return ''}const d=def(x.id),L2=S.active.list;body=`<h2>${esc(d.n)}</h2>
@@ -967,7 +969,8 @@ function sheetHTML(){
    <div class="field"><span class="label">Portions</span><div class="seg" id="fpseg">${[0.5,1,1.5,2].map(x=>`<button class="${s.x===x?'on':''}" data-a="portion" data-x="${x}">${xTxt(x)}</button>`).join('')}</div></div>
    ${pg?`<div class="row"><input id="fpG" class="num" type="number" inputmode="decimal" value="${Math.round(pg.G*s.x)}" data-c="fpg" data-g="${pg.G}" aria-label="Amount in ${pg.u}" style="width:110px"><span class="small muted grow">${pg.u} · or type how much you ate</span></div>`:''}
    <div id="fstat">${stat3(f,s.x)}</div>
-   <button class="btn primary block" data-a="addfood">Add${where}</button>`}
+   <button class="btn primary block" data-a="addfood">Add${where}</button>
+   ${f.cat==='mine'?`<button class="btn ghost block" data-a="myfooddel" style="color:var(--bad)">Remove from My items</button>`:''}`}
   if(s.kind==='food100'){const r=s.r;body=`<h2>${esc(r.n)}</h2><p class="small muted">${r.src==='usda'?'USDA lab data':'Open Food Facts label'} · per 100 g: ${fmt(r.k)} kcal · ${g1(r.pr)} P · ${g1(r.c)} C · ${g1(r.f)} F${r.fi?' · '+g1(r.fi)+' fiber':''}</p>${r.pr==null||r.c==null||r.f==null?'<p class="tiny muted">"?" means the label does not say. It counts as 0.</p>':''}
    <div class="row"><input id="dbG" class="num" type="number" inputmode="decimal" value="${s.g}" data-c="dbg" aria-label="Grams eaten" style="width:110px"><span class="small muted grow">grams</span></div>
    <div class="row wrap" style="gap:6px">${[...new Set([r.serv,50,100,150,200,300].filter(Boolean))].map(g=>`<button class="chip${s.g===g?' on':''}" data-a="dbg" data-g="${g}">${g} g${g===r.serv?' (1 serving)':''}</button>`).join('')}</div>
@@ -975,9 +978,9 @@ function sheetHTML(){
    <div class="grid2"><button class="btn primary" data-a="dbadd">Add</button><button class="btn" data-a="dbadd" data-keep="1">Add + save to list</button></div>
    <p class="small muted">Weigh it cooked if the name says cooked, raw if it says raw.</p>`}
   if(s.kind==='custom'){body=`<h2>Custom item</h2>
-   <div class="field"><label class="label" for="cfN">Name</label><input id="cfN" placeholder="e.g. Crunchwrap Supreme"></div>
+   <div class="field"><label class="label" for="cfN">Name</label><input id="cfN" placeholder="e.g. Crunchwrap Supreme" value="${esc(s.n||'')}"></div>
    <div class="field"><label class="label" for="cfP">Portion</label><input id="cfP" placeholder="e.g. 1 regular"></div>
-   <div class="grid2">${[['cfK','kcal'],['cfPr','Protein g'],['cfC','Carbs g'],['cfF','Fat g']].map(([id,l])=>`<div class="field"><label class="label" for="${id}">${l}</label><input id="${id}" class="num" type="number" inputmode="numeric"></div>`).join('')}</div>
+   <div class="grid2">${[['cfK','kcal'],['cfPr','Protein g'],['cfC','Carbs g'],['cfF','Fat g']].map(([id,l])=>`<div class="field"><label class="label" for="${id}">${l}</label><input id="${id}" class="num" type="number" inputmode="decimal" min="0"></div>`).join('')}</div>
    <div class="field"><label class="label" for="cfS">Where the numbers come from</label><select id="cfS"><option value="">My estimate</option><option value="label">Package label</option><option value="official">Official restaurant site</option></select></div>
    <div class="field"><label class="label" for="cfU">Source link</label><input id="cfU" type="url" placeholder="https://"></div>
    <button class="btn primary block" data-a="savecustom">Save and add to today</button>`}
@@ -990,15 +993,15 @@ function sheetHTML(){
     <div class="row"><input id="wdD" type="date" max="${TODAY}" value="${addDays(TODAY,-1)}" aria-label="Date" style="flex:1.3"><input id="wdK" class="num" type="number" inputmode="decimal" step="0.1" placeholder="kg" aria-label="Weight in kg" style="flex:1"></div>
     <label class="row" style="gap:8px"><input id="wdF" type="checkbox" checked style="width:20px;height:20px"><span class="small">Fasted morning weigh-in</span></label>
     <button class="btn primary" data-a="wadd">Save</button></div>
-   <div class="stack">${ws.map(w=>`<div class="row between card flat" style="padding:10px 12px"><div><b>${w.kg} kg</b> <span class="small muted">${fmtDate(w.d)}${w.t?' · '+w.t:''}</span></div>
+   <div class="stack">${ws.map(w=>`<div class="row between card flat" style="padding:10px 12px"><button data-a="wpick" data-d="${w.d}" data-kg="${w.kg}" style="background:none;border:0;padding:0;text-align:left;color:inherit;font:inherit" aria-label="Change ${fmtDate(w.d)}"><b>${w.kg} kg</b> <span class="small muted">${fmtDate(w.d)}${w.t?' · '+w.t:''}</span> <span class="tiny" style="color:var(--violet)">edit</span></button>
      <div class="row" style="gap:6px"><button class="chip ${w.fasted===false?'warn':'good'}" data-a="wtog" data-d="${w.d}">${w.fasted===false?'Not fasted':'Fasted'}</button><button class="icon-btn s" data-a="wdel" data-d="${w.d}" aria-label="Delete ${fmtDate(w.d)}">${I.x}</button></div></div>`).join('')||'<p class="small muted">No weigh-ins yet.</p>'}</div>
-   <p class="small muted">Tap Fasted / Not fasted to switch. Only fasted ones count toward the trend.</p>`}
+   <p class="small muted">Tap a weight to change it. Tap Fasted / Not fasted to switch. Only fasted ones count toward the trend.</p>`}
   if(s.kind==='shake'){const last=S.profile.shake||{},sp=S.supps[TODAY]||{},crOk=hasSupp('cr'),fe=sp.feAt!=null&&sp.feAt+60>nowMinD()?sp.feAt+60:null;
    body=`<h2>Protein shake</h2><p class="small muted">Rule 1 whey and semi-skimmed milk${crOk?', plus creatine':''}, logged as one item.</p>
    ${fe!=null?`<p class="small"><b class="hi">Iron was less than an hour ago.</b> Milk and whey block it. Better after ${hm(fe)}.</p>`:''}
    <div class="stack">${[1,1.5,2].map(v=>{const x=shakeItem(v,false);return `<button class="btn block${last.sc===v?' primary':''}" data-a="shake" data-v="${v}">${v} scoop${v>1?'s':''} · ${x.ml} ml milk <span class="small${last.sc===v?'':' muted'}">· ${x.k} kcal · ${x.pr} g protein</span></button>`}).join('')}</div>
    ${crOk?`<label class="row" style="gap:8px"><input id="shCr" type="checkbox" ${!sp.cr&&last.cr!==false?'checked':''} style="width:20px;height:20px"><span class="small">5 g creatine in it${sp.cr?' (creatine already ticked today)':''}</span></label>`:''}`}
-  if(s.kind==='steps'){body=`<h2>Steps today</h2><input id="stIn" class="num" type="number" inputmode="numeric" placeholder="e.g. 6500" aria-label="Steps"><button class="btn primary block" data-a="logsteps">Save</button>${hook('steps')}`}
+  if(s.kind==='steps'){body=`<h2>Steps today</h2><input id="stIn" class="num" type="number" inputmode="numeric" min="0" placeholder="e.g. 6500" value="${S.steps[TODAY]??''}" aria-label="Steps"><button class="btn primary block" data-a="logsteps">Save</button>${hook('steps')}`}
   if(s.kind==='max'){const m=MOVES.find(x=>x.id===s.m),h=S.gtg.max[m.id]||[];body=`<h2>${m.n}: ${m.u==='s'?'best hold':'max test'}</h2><p class="small">${m.u==='s'?'Fresh, forearms down, one straight line. Stop the clock when your hips sag or drop.':'Fresh, after a warm-up, one all-out set with clean reps only.'}</p>
    ${m.u==='s'?`<div class="holdclock" id="pclock">${UI.pt?Math.floor((Date.now()-UI.pt)/1000):s.v||0}</div><button class="btn block" data-a="ptime">${UI.pt?'Stop':'Start clock'}</button>`:''}
    <input id="mxIn" class="num" type="number" inputmode="numeric" placeholder="${m.u==='s'?'seconds':'reps'}" value="${s.v||''}" aria-label="Max"><button class="btn primary block" data-a="savemax" data-m="${m.id}">Save</button>
@@ -1456,6 +1459,9 @@ const foodDayNow=()=>UI.tab==='eat'&&UI.foodDay&&UI.foodDay<TODAY?UI.foodDay:TOD
 const feCur=()=>{const s=UI.sheet;if(!s||s.kind!=='fedit'||!s.e)return null;return (S.food[s.d]||[]).includes(s.e)?s.e:null};
 // An imported (MyFitnessPal) entry you change here stays changed on the next sync.
 // Only what you actually changed is kept over MFP's numbers (amount, or the numbers you typed), so a later fix in MFP still comes through for the rest.
+// A tape measure for the date picked in the Tape measure sheet (today if there's no date box), kept in date order.
+function tapeLog(key,sel,lo,hi,name){const el=$(sel),v=parseFloat(el&&el.value),dd=$('#tpD'),d=dd&&dd.value&&dd.value<=TODAY?dd.value:TODAY;
+  if(!(v>lo&&v<hi))return toast('Enter your '+name.toLowerCase()+' in cm');S[key]=S[key].filter(w=>w.d!==d);S[key].push({d,cm:v});S[key].sort((a,b)=>a.d<b.d?-1:1);save();render();toast(name+' saved'+(d===TODAY?'':' for '+fmtDate(d)))}
 function keepImp(e,d,keys=['x']){if(!e||!e.iid)return;S.impEdit=S.impEdit||{};const o={...(S.impEdit[e.iid]||{}),d};keys.forEach(k=>{o[k]=e[k]});S.impEdit[e.iid]=o}
 // Opened from a meal's "+" on the Food screen (UI.slotT), new food lands in that meal, today or on a past day.
 // Protein shake: Rule 1 whey (R1 Whey Blend label, per scoop) + semi-skimmed milk (per 100 ml) + optional 5 g creatine (0 kcal),
@@ -1537,11 +1543,12 @@ const A={
    if(k==='cr'&&s.cr&&!S.profile.creatineStart){S.profile.creatineStart=TODAY;toast('Creatine start date saved')}
    if(k==='wh'){if(s.wh)pushFood({n:'Whey protein',k:120,pr:24,c:3,f:2,x:1,auto:'wh'});else{const a=S.food[TODAY]||[];const i=a.findIndex(e=>e.auto==='wh');if(i>=0)a.splice(i,1)}}
    save();render()},
- logwaist:()=>{const v=parseFloat($('#waIn').value);if(!(v>50&&v<150))return toast('Enter your waist in cm');S.waist=S.waist.filter(w=>w.d!==TODAY);S.waist.push({d:TODAY,cm:v});save();render();toast('Waist saved')},
- logneck:()=>{const v=parseFloat($('#nkIn').value);if(!(v>25&&v<60))return toast('Enter your neck in cm');S.neck=S.neck.filter(w=>w.d!==TODAY);S.neck.push({d:TODAY,cm:v});save();render();toast('Neck saved')},
+ logwaist:()=>tapeLog('waist','#waIn',50,150,'Waist'),
+ logneck:()=>tapeLog('neck','#nkIn',25,60,'Neck'),
  bflook:t=>{const i=+t.dataset.i;if(S.bfLook[TODAY]===i)delete S.bfLook[TODAY];else S.bfLook[TODAY]=i;save();render()},
- logarm:()=>{const v=parseFloat($('#arIn').value);if(!(v>20&&v<60))return toast('Enter your arm in cm');S.arm=S.arm.filter(w=>w.d!==TODAY);S.arm.push({d:TODAY,cm:v});save();render();toast('Arm saved')},
+ logarm:()=>tapeLog('arm','#arIn',20,60,'Arm'),
  demo:()=>{[75.6,75.9,75.4,76.1,76.0,76.4,76.2,76.6,76.5,76.9].forEach((kg,i)=>S.weights.push({d:addDays(TODAY,i-9),kg,sample:true}));save();render()},
+ wpick:t=>{const d=$('#wdD'),k=$('#wdK');if(!d||!k)return;d.value=t.dataset.d;k.value=t.dataset.kg;const sh=$('.sheet');if(sh)sh.scrollTo({top:0,behavior:'smooth'});k.focus();k.select()},
  clearsample:()=>{S.weights=S.weights.filter(w=>!w.sample);save();render()},
  applyadj:t=>{const p=S.profile,v=+t.dataset.v,basis=targets().meas?'meas':'est';if(p.ciLast&&diffDays(p.ciLast,TODAY)<7)return;
    if((p.adjOn||'est')!==basis){p.kcalAdj=0;p.adjOn=basis}p.kcalAdj=(p.kcalAdj||0)+v;p.ciPrev=p.ciLast||null;p.ciLast=TODAY;p.ciAdj=v;save();render();toast('Target is now '+fmt(targets().k)+' kcal')},
@@ -1659,9 +1666,12 @@ const A={
  histundo:t=>{if(tapTwice())return;histPrune();const h=HIST.find(x=>x.id===+t.dataset.i);if(h)histUndo(h);else{toast('That one has expired');renderSheet()}},
  quickpr:t=>{const g=+t.dataset.g,d=foodDayNow(),id=newG();pushFood({n:'Protein, quick add',k:g*4,pr:g,c:0,f:0,x:1,g:id});save();render();
    toast('+'+g+' g protein',()=>{S.food[d]=(S.food[d]||[]).filter(z=>z.g!==id);save();render()})},
- customfood:()=>{UI.sheet={kind:'custom'};renderSheet()},
- savecustom:t=>{const n=$('#cfN').value.trim(),kr=$('#cfK').value.trim(),k=+kr;if(!n||kr===''||!(k>=0))return toast('Name and kcal are required (0 is fine for water or black coffee)');if(bigAsk(k,()=>A.savecustom({dataset:{ok:1}}),t))return;
+ customfood:()=>{const q=UI.sheet&&UI.sheet.kind==='search'?String(UI.foodQ||'').trim():'';UI.sheet={kind:'custom',n:q};renderSheet()},
+ myfooddel:()=>{if(tapTwice())return;const f=UI.sheet&&UI.sheet.f;if(!f)return;const i=S.myFoods.findIndex(x=>x.n===f.n&&x.k===f.k&&(x.code||'')===(f.code||''));if(i<0)return;const was=S.myFoods.splice(i,1)[0];save();UI.sheet=null;render();toast('Removed '+was.n+' from My items',()=>{S.myFoods.splice(i,0,was);save();render()})},
+ savecustom:t=>{const n=$('#cfN').value.trim(),kr=$('#cfK').value.trim(),k=+kr;if(!n||kr===''||!(k>=0))return toast('Name and kcal are required (0 is fine for water or black coffee)');if(['#cfPr','#cfC','#cfF'].some(q=>+$(q).value<0))return toast('Protein, carbs and fat can\'t be negative');if(bigAsk(k,()=>A.savecustom({dataset:{ok:1}}),t))return;
    const f={n,p:$('#cfP').value.trim()||'1 serving',k,pr:+$('#cfPr').value||0,c:+$('#cfC').value||0,f:+$('#cfF').value||0,src:$('#cfS').value||undefined,url:$('#cfU').value.trim()||undefined,al:n.toLowerCase()};
+   // Saving a name you already have replaces that one instead of adding a second.
+   const di=S.myFoods.findIndex(x=>!x.code&&x.n.toLowerCase()===n.toLowerCase());if(di>=0)S.myFoods.splice(di,1);
    S.myFoods.push(f);pushFood({n:f.n,k:f.k,pr:f.pr,c:f.c,f:f.f,x:1});save();UI.sheet=null;UI.foodCat='mine';render();toast('Saved to My items')},
  // calisthenics
  // Mistyped set in daily reps: tap it to remove it (undo puts it back).
@@ -1720,7 +1730,7 @@ const A={
  recapm:t=>{UI.sheet.ym=t.dataset.m;renderSheet()},
  resched:t=>{UI.sheet={kind:'resched',d:t.dataset.d};renderSheet()},
  reschmove:t=>{const {from,to,id}=t.dataset;S.resched[from]=null;S.resched[to]=id;UI.sheet=null;save();render();toast(S.program.find(x=>x.id===id).name+' moved to '+fmtDate(to))},
- reschskip:t=>{S.resched[t.dataset.from]=null;UI.sheet=null;save();render();toast('Skipped this week')},
+ reschskip:t=>{const f=t.dataset.from,had=Object.prototype.hasOwnProperty.call(S.resched,f),o=S.resched[f];S.resched[f]=null;UI.sheet=null;save();render();toast('Skipped this week',()=>{if(had)S.resched[f]=o;else delete S.resched[f];save();render()})},
  reschreset:()=>{Object.keys(S.resched).forEach(d=>{if(reschThisWeek(d))delete S.resched[d]});UI.sheet=null;save();render();toast('Back to your normal week')},
  circsheet:t=>{const c=CIRCUITS.find(x=>x.id===t.dataset.id);UI.sheet={kind:'circ',id:c.id,o:{work:c.work,rest:c.rest,rounds:c.rounds,min:c.min,peak:5}};renderSheet()},
  circopt:t=>{UI.sheet.o[t.dataset.k]=+t.dataset.v;renderSheet()},

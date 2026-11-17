@@ -235,12 +235,15 @@ function descRes(){const parsed=parseMeal(UI.desc),pTot=parsed.reduce((a,{f,x})=
       <button class="btn block" data-a="adddesc" style="margin-top:6px">Add these</button></details>`:''}`}
 const mealRow=m=>`<div class="li"><button class="icon-btn s" data-a="mealpin" data-sig="${esc(m.sig)}" aria-label="${m.pin?'Unpin':'Pin'} this meal" style="color:${m.pin?'var(--accent)':'var(--muted)'}">${m.pin?'★':'☆'}</button>
        <div class="grow"><b class="small hi">${esc(m.label||mealName(m.items))}</b><p class="small muted">${fmt(mealK(m.items))} kcal · ${Math.round(mealP(m.items))} P${m.n?` · ${m.n}× lately`:''}</p></div><button class="btn sm" data-a="mealadd" data-sig="${esc(m.sig)}">+ Add</button></div>`;
+// One meal of an earlier day (breakfast, lunch...), with every item in it, ready to add again.
+const yRow=(d,k,when)=>{const y=slotItems(d,k);return `<div class="li"><div class="grow"><b class="small hi">${when}'s ${SLOT_N[k].toLowerCase()}</b><p class="small muted">${esc(mealName(y))}</p><p class="tiny muted">${fmt(mealK(y))} kcal · ${Math.round(mealP(y))} P</p></div><button class="btn sm" data-a="copyslot" data-d="${d}" data-k="${k}">+ Add</button></div>`};
 function sheetX0(s){
   const k=s.kind,t=targets();
-  if(k==='slotadd'){const dn=foodDayNow(),nm=SLOT_N[s.k],ms=againList().filter(m=>m.slot===s.k).slice(0,6);
+  if(k==='slotadd'){const dn=foodDayNow(),nm=SLOT_N[s.k],ms=againList().filter(m=>m.slot===s.k).slice(0,6),yd=addDays(dn,-1),y=slotItems(yd,s.k);
     const Act=(a,icn,title,sub)=>`<button class="act" ${a}>${ic(icn)}${title}<small>${sub}</small></button>`;
     return `<p class="label">${dn===TODAY?'Today':fmtDate(dn)}</p><h2>Add to ${nm.toLowerCase()}</h2>
      <div class="acts">${Act('data-a="scan"','barcode','Scan barcode','packaged food')}${Act('data-a="sheet" data-k="describe"','camera','Photo or say it','AI estimate')}${Act('data-a="sheet" data-k="search"','search','Search food','your list and online')}${Act('data-a="customfood"','list','Type it in','your own numbers')}</div>
+     ${y.length?`<div class="recent">${yRow(yd,s.k,dn===TODAY?'Yesterday':fmtDate(yd))}</div>`:''}
      ${ms.length?`<p class="label" style="margin-top:4px">Your usual ${nm.toLowerCase()}</p><div class="recent">${ms.map(mealRow).join('')}</div>`:''}
      <button class="linkbtn" data-a="sheet" data-k="again" style="align-self:flex-start">All repeats</button>`}
   if(k==='finconfirm'){const n=s.n;return `<h2>${n} set${n>1?'s':''} not ticked</h2><p class="small">${n>1?'They have':'It has'} reps typed in but no tick, so ${n>1?'they':'it'} would be left out.</p>
@@ -263,14 +266,21 @@ function sheetX0(s){
   if(k==='repset'){const g=gtgDay(TODAY),nx=gtgNext(),tr=trainedToday();
     return `<h2>Rep set</h2><p class="small muted">One easy set of each, about half your max. ${nx==null?'Reminders are done for today.':nx<=nowMin()?'A set is due now.':'Next reminder at '+hm(nx)+'.'}</p>
      <button class="btn cta block" data-a="repall">Did it · ${repSetTxt()}</button>
-     <div class="card">${MOVES.filter(m=>S.gtg.on.includes(m.id)).map(m=>{const dn=g[m.id]||[];return `<div class="ex"><span class="thumb">${gMedia(m.g)}</span><span class="grow"><b>${m.n}</b><br><span class="small muted">${dn.length?'today: '+dn.join(', '):'none yet'}${tr.has(m.m)&&m.m!=='abs'?' · trained in the gym today':''}</span></span>
+     <div class="card">${MOVES.filter(m=>S.gtg.on.includes(m.id)).map(m=>{const dn=g[m.id]||[];return `<div class="ex"><span class="thumb">${gMedia(m.g)}</span><span class="grow"><b>${m.n}</b><br><span class="small muted">${dn.length?'today:':'none yet'}${tr.has(m.m)&&m.m!=='abs'?' · trained in the gym today':''}</span>${dn.length?`<span class="row wrap" style="gap:4px;margin-top:4px">${dn.map((v,i)=>`<button class="chip" data-a="gtgrm" data-m="${m.id}" data-i="${i}" aria-label="Remove the set of ${v}" style="padding:3px 8px;font-size:12px">${v}${m.u==='s'?' s':''} <span class="muted">×</span></button>`).join('')}</span>`:''}</span>
        <input class="num" id="rs-${m.id}" type="number" inputmode="numeric" value="${setSize(m.id)}" aria-label="${m.n} ${m.u==='s'?'seconds':'reps'}" style="width:70px;padding:7px"><button class="btn sm" data-a="gtglog2" data-m="${m.id}">Log</button>${m.u==='s'?`<button class="icon-btn s" data-a="htsheet" data-m="${m.id}" aria-label="Time the ${m.n.toLowerCase()}">${ic('clock')}</button>`:''}</div>`}).join('')}</div>
      <div class="row"><button class="btn sm ghost" data-a="remindsheet">Reminder times</button><button class="btn sm ghost" data-a="tab" data-t="train" data-tt="reps">Open daily reps</button></div>`}
-  if(k==='weight'){const ws=countedW().slice(-5).reverse(),lw=ws[0];
+  if(k==='weight'){const ws=countedW().slice(-5).reverse(),lw=ws[0],tw=S.weights.find(x=>x.d===TODAY&&!x.sample);
     return `<h2>Morning weight</h2><p class="small muted">Right after waking, after the toilet, before food or water. Same scale, same spot.</p>
-     <div class="row"><input class="num grow" id="wIn3" type="number" inputmode="decimal" step="0.1" placeholder="${lw?lw.kg:'kg'}" aria-label="Weight in kg" style="font-size:30px;padding:12px"><button class="btn cta" data-a="logw3" style="padding:16px 20px">Save</button></div>
+     <div class="row"><input class="num grow" id="wIn3" type="number" inputmode="decimal" step="0.1" placeholder="${lw?lw.kg:'kg'}" value="${tw?tw.kg:''}" aria-label="Weight in kg" style="font-size:30px;padding:12px"><button class="btn cta" data-a="logw3" style="padding:16px 20px">Save</button></div>
      ${ws.length?`<div class="list">${ws.map(x=>`<div class="li small"><span class="grow muted">${fmtDate(x.d)}</span><b class="hi">${x.kg} kg</b></div>`).join('')}</div>`:''}
      <button class="btn sm ghost" data-a="wedit" style="align-self:flex-start">Edit or add past weigh-ins</button>`}
+  if(k==='yday'){const yd=addDays(TODAY,-1),sp=S.supps[yd]||{},sl=S.sleep[yd],st=S.steps[yd],w=S.weights.find(x=>x.d===yd&&!x.sample);
+    const sk=[['fe','Iron'],['cr','Creatine'],['mg','Magnesium']].filter(([q])=>hasSupp(q));
+    return `<p class="label">${fmtDate(yd)}</p><h2>Fix yesterday</h2>
+     ${sk.length?`<div class="field"><span class="label">Supplements taken</span><div class="row wrap" style="gap:6px">${sk.map(([q,n])=>`<button class="chip${sp[q]?' on':''}" data-a="ysupp" data-k="${q}">${sp[q]?'✓ ':''}${n}</button>`).join('')}</div></div>`:''}
+     <div class="field"><label class="label" for="ySt">Steps</label><div class="row"><input id="ySt" class="num grow" type="number" inputmode="numeric" min="0" value="${st??''}" placeholder="e.g. 6500"><button class="btn primary" data-a="yset" data-f="steps">Save</button></div></div>
+     <div class="field"><label class="label" for="ySl">Sleep the night before, hours</label><div class="row"><input id="ySl" class="num grow" type="number" inputmode="decimal" step="0.25" min="0" max="16" value="${sl??''}" placeholder="e.g. 7"><button class="btn primary" data-a="yset" data-f="sleep">Save</button></div></div>
+     <p class="small muted">${w?`Weight ${w.kg} kg is logged.`:'No weigh-in yesterday.'} Weigh-ins and food for other days: <button class="linkbtn" data-a="wedit" style="display:inline">weigh-ins</button> · <button class="linkbtn" data-a="gofood" data-d="${yd}" style="display:inline">yesterday's food</button>.</p>`}
   if(k==='sleep'){const sl=S.sleep[TODAY];return `<h2>Sleep last night</h2><div class="row wrap" style="gap:6px">${[5,5.5,6,6.5,7,7.5,8,8.5,9].map(v=>`<button class="chip${sl===v?' on':''}" data-a="setsleep" data-v="${v}">${v} h</button>`).join('')}</div>
      <div class="row"><input id="slIn2" class="num grow" type="number" inputmode="decimal" step="0.25" min="0" max="16" placeholder="other, e.g. 4.5" value="${sl!=null&&![5,5.5,6,6.5,7,7.5,8,8.5,9].includes(sl)?sl:''}" aria-label="Hours slept"><button class="btn primary" data-a="setsleep">Save</button></div>
      <p class="small muted">Under 6.5 h, the app tells you to skip the last set of each exercise and hold off on record attempts.</p>`}
@@ -285,7 +295,8 @@ function sheetX0(s){
   if(k==='scan')return `<h2>Scan a barcode</h2>${hook('offCard')||'<p class="small muted">Barcode lookup is not available here.</p>'}`;
   if(k==='again'){const rec=againList(),yest=groupsOn(addDays(TODAY,-1)),by=[0,1,2,3].map(sl=>rec.filter(m=>m.slot===sl)),rest=rec.filter(m=>!(m.slot>=0));
     return `<h2>Repeats</h2><p class="small muted">One tap adds the whole meal. ☆ pins it for good.</p>
-     ${yest.length&&foodDayNow()===TODAY?`<button class="btn" data-a="copyyest">${ic('repeat')} Same as yesterday · ${yest.length} meal${yest.length>1?'s':''}</button>`:''}
+     ${(()=>{const dn=foodDayNow(),yd=addDays(dn,-1),w=dn===TODAY?'Yesterday':fmtDate(yd),ks=[0,1,2,3].filter(k=>slotItems(yd,k).length);return ks.length?`<p class="label" style="margin-top:4px">${w}, one meal at a time</p><div class="recent">${ks.map(k=>yRow(yd,k,w)).join('')}</div>`:''})()}
+     ${yest.length&&foodDayNow()===TODAY?`<button class="btn" data-a="copyyest">${ic('repeat')} All of yesterday · ${yest.length} meal${yest.length>1?'s':''}</button>`:''}
      ${rec.length?by.map((ms,sl)=>ms.length?`<p class="label" style="margin-top:4px">${SLOT_N[sl]}</p><div class="recent">${ms.map(mealRow).join('')}</div>`:'').join('')+(rest.length?`<p class="label" style="margin-top:4px">Other</p><div class="recent">${rest.map(mealRow).join('')}</div>`:''):'<p class="small muted">Meals you log show up here.</p>'}`}
   if(k==='hist'){const td=TODAY,tm=h=>{const d=new Date(h.at),day=dayOf(h.at);return (day===td?'':fmtDate(day)+' · ')+pad(d.getHours())+':'+pad(d.getMinutes())};
     return `<h2>Recent changes</h2><p class="small muted">Did something by mistake? Take it back here, newest first. Things you deleted (food, sessions, weigh-ins, rep sets, tape measures) are kept for 7 days. Other changes can be undone until the app is closed.</p>
@@ -295,8 +306,8 @@ function sheetX0(s){
   if(k==='circs')return `<h2>Circuits</h2><p class="small muted">Thursday is circuit day, at about 7/10 effort. Cindy makes a good monthly test. Never do a hard circuit the day before leg day.</p><div>${circList()}</div>`;
   if(k==='measure'){const M=(arr,id,act,l,tip,ph)=>{const a=lastOf(arr);return `<div class="card stack"><div class="row between"><p class="label">${l}</p>${a?`<span class="small"><b class="hi">${a.cm} cm</b> <span class="muted">${fmtDate(a.d)}</span></span>`:''}</div>
       <div class="row"><input id="${id}" class="num grow" type="number" inputmode="decimal" step="0.5" placeholder="${ph}" aria-label="${l} in cm"><button class="btn primary" data-a="${act}">Save</button></div>
-      ${arr.length?`<div class="row wrap" style="gap:6px">${arr.slice(-5).map(x=>`<button class="chip" data-a="tapedel" data-f="${act.slice(3)}" data-d="${x.d}" aria-label="Delete ${x.cm} cm from ${fmtDate(x.d)}">${x.cm} <span class="muted">${dShort(x.d)} ×</span></button>`).join('')}<span class="tiny muted" style="align-self:center">tap one to delete it</span></div>`:''}<p class="tiny muted">${tip}</p></div>`};
-    return `<h2>Tape measure</h2>${M(S.waist,'waIn','logwaist','Waist, at the navel','Weekly, in the morning, relaxed belly. This is your belly-fat meter: if it grows more than 1.5 cm in a month, the check-in pulls calories down.','cm')}
+      ${arr.length?`<div class="row wrap" style="gap:6px">${(UI.tapeAll?arr:arr.slice(-5)).map(x=>`<button class="chip" data-a="tapedel" data-f="${act.slice(3)}" data-d="${x.d}" aria-label="Delete ${x.cm} cm from ${fmtDate(x.d)}">${x.cm} <span class="muted">${dShort(x.d)} ×</span></button>`).join('')}<span class="tiny muted" style="align-self:center">tap one to delete it</span>${arr.length>5&&!UI.tapeAll?`<button class="linkbtn" data-a="tapeall">All ${arr.length}</button>`:''}</div>`:''}<p class="tiny muted">${tip}</p></div>`};
+    return `<h2>Tape measure</h2><div class="row"><label class="label grow" for="tpD">Measured on</label><input id="tpD" type="date" max="${TODAY}" value="${TODAY}" style="width:170px"></div>${M(S.waist,'waIn','logwaist','Waist, at the navel','Weekly, in the morning, relaxed belly. This is your belly-fat meter: if it grows more than 1.5 cm in a month, the check-in pulls calories down.','cm')}
      ${M(S.arm,'arIn','logarm','Arm, flexed','Monthly. Your main goal.','cm')}${M(S.neck,'nkIn','logneck','Neck','Monthly, just below the Adam\'s apple. Tightens the body-fat estimate.','cm')}`}
   if(k==='bf')return `<h2>Body fat</h2>${bfCard()}`;
   if(k==='goal'){const g=goalList().find(x=>x.id===s.id);if(!g)return '<p class="small muted">That goal is gone.</p>';const e=g.e;
@@ -565,6 +576,12 @@ Object.assign(A,{
  sheet:t=>{const d={...t.dataset};delete d.a;const k=d.k;delete d.k;if(k==='describe')freshAI();UI.sheet={kind:k,...d};renderSheet();const sh=$('.sheet');if(sh)sh.scrollTop=0},
  traintab:t=>{UI.trainTab=t.dataset.v;UI.enter=true;render();scrollTo(0,0)},
  planday:t=>{UI.planDay=t.dataset.d;render()},
+ ysupp:t=>{const yd=addDays(TODAY,-1),k=t.dataset.k,s=S.supps[yd]=S.supps[yd]||{};s[k]=!s[k];if(k==='cr'&&s.cr&&!S.profile.creatineStart)S.profile.creatineStart=yd;save();buzz(15);render()},
+ yset:t=>{const yd=addDays(TODAY,-1),f=t.dataset.f,el=$(f==='steps'?'#ySt':'#ySl'),raw=(el&&el.value||'').replace(',','.').trim(),v=+raw;
+   if(raw===''){delete S[f][yd];save();render();return toast(f==='steps'?'Steps cleared':'Sleep cleared')}
+   if(f==='steps'?!(v>=0&&v<=60000):!(v>0&&v<=16))return toast(f==='steps'?'Steps, e.g. 6500':'Hours slept, e.g. 7');
+   S[f][yd]=f==='steps'?Math.round(v):Math.round(v*100)/100;save();render();toast((f==='steps'?'Steps':'Sleep')+' saved for '+fmtDate(yd))},
+ planwk:t=>{UI.planWk=Math.min(0,(UI.planWk||0)+(+t.dataset.d));UI.planDay=null;render()},
  setsupp:t=>{const k=t.dataset.k,a=Array.isArray(S.profile.supps)?S.profile.supps:SUPPN.map(x=>x[0]),i=a.indexOf(k);if(i>=0)a.splice(i,1);else a.push(k);S.profile.supps=a;save();render()},
  hintoff:()=>{UI.hintOff=true;render()},
  // Prayer times for where you are: the position is rounded to about 1 km and stays on the phone.
@@ -665,6 +682,18 @@ Object.assign(A,{
  foodday:t=>{const d=+t.dataset.d,n=d===0?TODAY:addDays(UI.foodDay||TODAY,d);UI.foodDay=n>=TODAY?null:n;render();scrollTo(0,0)},
  gofood:t=>{UI.sheet=null;UI.tab='eat';UI.foodDay=t.dataset.d>=TODAY?null:t.dataset.d;UI.enter=true;render();scrollTo(0,0)},
  copyday:t=>{UI.foodDay=null;copyMeals(groupsOn(t.dataset.d),'to today');scrollTo(0,0)},
+ // Repeat one meal of a day (yesterday's breakfast) as one meal, in the same meal of the day you're on.
+ // From a past day's own screen it goes to today. Tapping twice doesn't double it.
+ copyslot:t=>{const from=t.dataset.d,k=+t.dataset.k,items=slotItems(from,k);if(!items.length)return toast('Nothing to copy');
+   if(UI.foodDay&&UI.foodDay===from)UI.foodDay=null;if(UI.sheet&&['again','slotadd'].includes(UI.sheet.kind))UI.sheet=null;
+   const d=foodDayNow(),sig=mealSig(items);if(d===from){render();return toast('That is the day you are on')}
+   if(groupsOn(d).some(gp=>mealSig(gp.items)===sig)||mealSig(slotItems(d,k))===sig){render();return toast('Already there')}
+   const g=newG();items.forEach(i=>pushFood({...strip(i),g,t:i.t!=null&&slotOf({t:i.t})===k?i.t:SLOT_T[k]}));save();render();buzz(20);
+   toast(SLOT_N[k]+' added · '+fmt(mealK(items))+' kcal',()=>{S.food[d]=(S.food[d]||[]).filter(e=>e.g!==g);save();render()})},
+ fcopy:()=>{const e=feCur();if(!e)return;const g=newG();(S.food[TODAY]=S.food[TODAY]||[]).push({...strip(e),g,t:nowMin()});UI.sheet=null;save();render();buzz(20);
+   toast('Added to today · '+fmt(e.k*e.x)+' kcal',()=>{S.food[TODAY]=(S.food[TODAY]||[]).filter(z=>z.g!==g);save();render()})},
+ foodpick:t=>{const d=t.dataset.d;UI.foodDay=d>=TODAY?null:d;render();scrollTo(0,0)},
+ tapeall:()=>{UI.tapeAll=true;renderSheet()},
  copyyest:()=>{if(UI.sheet&&UI.sheet.kind==='again')UI.sheet=null;copyMeals(groupsOn(addDays(TODAY,-1)),'from yesterday')},
  // One tap adds a whole meal, so it always comes with an Undo. Undo takes back only that meal.
  // A repeat lands in the meal it usually is ("usual dinner" goes to dinner even in the morning), unless you opened a meal's "+".
@@ -716,9 +745,27 @@ document.addEventListener('keydown',e=>{const t=e.target;if(e.key!=='Enter'||t.t
   let b=null;if(want)b=document.querySelector(`button[data-a="${want}"]${/^(gtg|rs)-/.test(id)?`[data-m="${m}"]`:''}:not([disabled])`);
   if(!b&&!want){const box=t.closest('.row,.go');b=box&&box.querySelector('button[data-a]:not([disabled])')}
   e.preventDefault();t.blur();if(b)b.click()});
+/* Tap or slide on a chart: shows the nearest point's date and value. Tapping anywhere else hides it. */
+(()=>{const NS='http://www.w3.org/2000/svg';let on=null;
+  const clear=()=>document.querySelectorAll('svg g.tip').forEach(g=>g.remove());
+  const show=(sv,cx)=>{let P;try{P=JSON.parse(sv.dataset.pts)}catch(_){return}const m=sv.getScreenCTM();if(!m||!P.length)return;
+    const q=sv.createSVGPoint();q.x=cx;q.y=0;const x=q.matrixTransform(m.inverse()).x;let b=P[0];P.forEach(p=>{if(Math.abs(p[0]-x)<Math.abs(b[0]-x))b=p});
+    const vb=sv.viewBox.baseVal;clear();const g=document.createElementNS(NS,'g');g.setAttribute('class','tip');
+    const el=(t,a,par=g)=>{const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);par.appendChild(e);return e};
+    el('line',{x1:b[0],x2:b[0],y1:vb.y,y2:vb.y+vb.height,stroke:'var(--hi)','stroke-opacity':.35,'stroke-dasharray':'2 3'});
+    el('circle',{cx:b[0],cy:b[1],r:5,fill:'var(--hi)',stroke:'var(--surface)','stroke-width':2});
+    const bg=el('rect',{rx:6,fill:'var(--raise2)',stroke:'var(--line2)'}),tx=el('text',{style:'font-size:11px;font-weight:700;fill:var(--hi)'});
+    String(b[2]).split('\n').filter(Boolean).forEach((l,i)=>{const s=el('tspan',{x:0,dy:i?14:0,...(i?{style:'fill:var(--muted);font-weight:600'}:{})},tx);s.textContent=l});
+    sv.appendChild(g);const bb=tx.getBBox(),w=bb.width+12,h=bb.height+8;
+    let lx=b[0]+10;if(lx+w>vb.x+vb.width-2)lx=b[0]-10-w;lx=Math.max(vb.x+2,lx);
+    let ty=b[1]-h-8;if(ty<vb.y+2)ty=b[1]+10;ty=Math.max(vb.y+2,Math.min(ty,vb.y+vb.height-h-2));
+    bg.setAttribute('x',lx);bg.setAttribute('y',ty);bg.setAttribute('width',w);bg.setAttribute('height',h);tx.setAttribute('transform',`translate(${lx+6},${ty+4-bb.y})`)};
+  document.addEventListener('pointerdown',e=>{const sv=e.target.closest&&e.target.closest('svg[data-pts]');if(!sv)return clear();on=sv;show(sv,e.clientX)});
+  document.addEventListener('pointermove',e=>{if(on)show(on,e.clientX)});
+  ['pointerup','pointercancel'].forEach(k=>document.addEventListener(k,()=>{on=null}))})();
 /* Swipe a sheet down to close it (from its top, or anywhere when it's scrolled to the top). */
 (()=>{let y0=null,dy=0,sh=null;
-  document.addEventListener('touchstart',e=>{const s=e.target.closest('.sheet');if(!s||e.touches.length>1||e.target.closest('input[type=range],.compare,textarea'))return;
+  document.addEventListener('touchstart',e=>{const s=e.target.closest('.sheet');if(!s||e.touches.length>1||e.target.closest('input[type=range],.compare,textarea,svg[data-pts]'))return;
     if(s.scrollTop>0&&!e.target.closest('.sheet-head'))return;sh=s;y0=e.touches[0].clientY;dy=0},{passive:true});
   document.addEventListener('touchmove',e=>{if(y0==null||!sh)return;dy=e.touches[0].clientY-y0;if(dy>0&&sh.scrollTop<=0){sh.style.transition='none';sh.style.transform=`translateY(${dy}px)`}else if(dy<0){sh.style.transform=''}},{passive:true});
   document.addEventListener('touchend',()=>{if(y0==null||!sh)return;const s=sh;y0=null;sh=null;s.style.transition='transform .18s var(--ease)';
@@ -730,7 +777,7 @@ document.addEventListener('change',async e=>{const t=e.target,c=t.dataset.c;if(!
   if(c==='ramcity'){if(t.value){S.profile.ramCityId=t.value;delete S.profile.ramLat;delete S.profile.ramLon;delete S.profile.ramCity;save();renderSheet()}}
   if(c==='gymat'&&t.value){S.profile.gymAt=t.value;S.profile.gymPin=true;save();render();toast('Gym time pinned at '+t.value)}
   if(c==='gymPin'){S.profile.gymPin=t.checked;if(t.checked&&!S.profile.gymAt){const gl=gymLearned();S.profile.gymAt=gl!=null?hm(gl):'18:00'}save();render()}
-  if(c==='feset'&&UI.sheet&&UI.sheet.kind==='fedit'){const en=feCur(),v=+t.value;if(en&&v>=0&&t.value!==''){if(en.pend&&window.NX&&NX.unpend)NX.unpend(UI.sheet.d,en);if(t.dataset.f==='k'&&en.k>0){const r=v/en.k;en.c=Math.round(en.c*r);en.f=Math.round(en.f*r)}en[t.dataset.f]=v;delete en.pend;delete en.nonum;keepImp(en,UI.sheet.d,t.dataset.f==='k'?['k','c','f']:[t.dataset.f]);
+  if(c==='feset'&&UI.sheet&&UI.sheet.kind==='fedit'){const en=feCur(),v=+t.value;if(en&&!(v>=0&&t.value!=='')){t.value=Math.round(en[t.dataset.f]||0);toast('Type a number, 0 or more')}if(en&&v>=0&&t.value!==''){if(en.pend&&window.NX&&NX.unpend)NX.unpend(UI.sheet.d,en);if(t.dataset.f==='k'&&en.k>0){const r=v/en.k;en.c=Math.round(en.c*r);en.f=Math.round(en.f*r)}en[t.dataset.f]=v;delete en.pend;delete en.nonum;keepImp(en,UI.sheet.d,t.dataset.f==='k'?['k','c','f']:[t.dataset.f]);
       const learned=t.dataset.f==='k'&&en.src==='ai'&&en.ak>0&&Math.round(v)!==Math.round(en.ak)&&window.NX&&NX.aiLearn&&NX.aiLearn(en.n,en.pg,en.ak,v);if(t.dataset.f==='k'&&en.ak>0&&Math.round(v)===Math.round(en.ak)&&window.NX&&NX.aiForget)NX.aiForget(en.n);save();render();if(learned)toast('Saved. The AI will use your number next time.')}}
   if(c==='phsel'){UI['ph'+t.dataset.k]=t.value;renderSheet()}
   if(c==='phdate'&&t.value&&t.value<=TODAY){const x=(S.photos||[]).find(p=>p.id===t.dataset.id);if(x){x.d=t.value;save();renderSheet();toast('Date changed')}}

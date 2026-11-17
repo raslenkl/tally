@@ -49,7 +49,7 @@ const nTimes=()=>({weigh:'07:30',mg:'23:00',...(S.profile.notif||{})});
 function ring2(v,max,big,small,color){const r=42,C=2*Math.PI*r,p=Math.min(1,max?v/max:0);
   return `<div class="ring"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="${r}" fill="none" stroke="var(--raise2)" stroke-width="8"/><circle class="v" cx="50" cy="50" r="${r}" fill="none" stroke="${color}" stroke-width="8" stroke-linecap="round" stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${(C*(1-p)).toFixed(1)}" style="--c:${C.toFixed(1)}"${p?'':' stroke-opacity="0"'}/></svg><div class="c"><div><b>${big}</b><br><span>${small}</span></div></div></div>`}
 const shortName=p=>p.name.includes('+')?p.name.split('+').map(s=>s.trim()[0]).join('+').toUpperCase():p.name.split(' ')[0].slice(0,4).toUpperCase();
-function weekDates(){const dow=(parse(TODAY).getDay()+6)%7,mon=addDays(TODAY,-dow);return [0,1,2,3,4,5,6].map(i=>addDays(mon,i))}
+function weekDates(w=0){const dow=(parse(TODAY).getDay()+6)%7,mon=addDays(TODAY,-dow+7*w);return [0,1,2,3,4,5,6].map(i=>addDays(mon,i))}
 // When you usually train: the middle of your last few session start times, or the time set in Settings.
 function gymLearned(){const ts=S.log.filter(l=>l.t0!=null).slice(-6).map(l=>l.t0).sort((a,b)=>a-b);return ts.length>=3?ts[Math.floor(ts.length/2)]:null}
 // Pinned in Settings: always that time. Otherwise the learned time once there are 3 timed sessions.
@@ -65,6 +65,8 @@ function leadLine(p){const e=p.ex[0];if(!e)return '';const d=def(e.x),h=lastFor(
 
 /* ===================== Food helpers ===================== */
 const SLOT_N=['Breakfast','Lunch','Snack','Dinner','Logged'];
+// Everything in one meal of a day (breakfast = slot 0), however it was added: one tap repeats it.
+const slotItems=(d,k)=>(S.food[d]||[]).filter(e=>!e.auto&&!e.pend&&slotOf(e)===k);
 // Which meal an entry belongs to: MyFitnessPal says so itself, everything else goes by the time it was logged.
 function slotOf(e){const m=String(e.g||'').match(/^(?:mfp|hc)-\d{4}-\d\d-\d\d-(.+)$/);
   if(m){const s=m[1].toLowerCase();return /break/.test(s)||s==='0'?0:/lunch/.test(s)||s==='1'?1:/dinner/.test(s)||s==='2'?3:2}
@@ -150,7 +152,7 @@ function tickRow(){
    ${hasSupp('mg')?T(!!sp.mg,'moon','Magnesium','data-a="supp" data-k="mg"'):''}
    ${T(sl!=null,'bed',sl!=null?sl+' h sleep':'Sleep','data-a="sheet" data-k="sleep"')}
    ${T(steps>0,'pulse',steps?(steps/1000).toFixed(1)+'k steps':'Steps','data-a="stepsheet"')}
-  </div>`}
+  </div><button class="linkbtn" data-a="sheet" data-k="yday" style="align-self:flex-start;margin-top:-4px">Forgot something yesterday?</button>`}
 function timelineCard(st){
   const nm=nowMinD(),sp=S.supps[TODAY]||{},n=nTimes(),plan=dayForDate(TODAY),lg=S.log.some(l=>l.d===TODAY),nx=gtgNext(),it=[];
   if(sp.feAt!=null&&sp.feAt+60>nm)it.push({m:sp.feAt+60,title:'Coffee and whey are fine',sub:'an hour after iron'});
@@ -206,18 +208,19 @@ function week7(t){
   if(lg.length<2)return '';
   const ak=lg.reduce((a,x)=>a+x.s.k,0)/lg.length,ap=lg.reduce((a,x)=>a+x.s.pr,0)/lg.length;
   return `<div class="card stack" style="gap:10px"><div class="row between"><p class="label">Last 7 days</p><span class="small"><b class="hi">${fmt(ak)}</b> <span class="muted">kcal ·</span> <b class="hi">${Math.round(ap)}</b> <span class="muted">g protein a day</span></span></div>
-   <div class="wk7">${v.map(x=>`<div><i class="${x.n&&x.s.pr>=t.pr*.9?'hit':''}${x.d===TODAY?' now':''}${x.n&&!x.full&&x.d!==TODAY?' half':''}" style="height:calc((100% - 16px)*${(x.n?Math.max(.05,x.s.k/mx):0).toFixed(3)})"></i><span>${DOW[parse(x.d).getDay()][0]}</span></div>`).join('')}</div>
-   <p class="tiny muted">Bar height is calories against your ${fmt(t.k)} target. Lit bars hit protein. Average of ${lg.length} ${lg0.length>=2?'fully logged ':''}days${lg0.length>=2&&half?`, ${half} half-logged left out (faded)`:''}.</p></div>`}
+   <div class="wk7">${v.map(x=>`<button data-a="foodpick" data-d="${x.d}" aria-label="Open ${fmtDate(x.d)}: ${fmt(x.s.k)} kcal"><i class="${x.n&&x.s.pr>=t.pr*.9?'hit':''}${x.d===TODAY?' now':''}${x.n&&!x.full&&x.d!==TODAY?' half':''}" style="height:calc((100% - 16px)*${(x.n?Math.max(.05,x.s.k/mx):0).toFixed(3)})"></i><span>${DOW[parse(x.d).getDay()][0]}</span></button>`).join('')}</div>
+   <p class="tiny muted">Tap a bar to open that day. Bar height is calories against your ${fmt(t.k)} target. Lit bars hit protein. Average of ${lg.length} ${lg0.length>=2?'fully logged ':''}days${lg0.length>=2&&half?`, ${half} half-logged left out (faded)`:''}.</p></div>`}
 function vEat(){
   const day=UI.foodDay||TODAY,isT=day===TODAY,t=targets(),sum=sumFood(day),low=S.profile.lowEffort,left=t.k-sum.k;
   const gs=[[],[],[],[],[]];(S.food[day]||[]).forEach((e,i)=>gs[slotOf(e)].push({e,i}));
   // Every meal of the day has its own place and its own "+". Your usual meals are offered where they belong:
   // in the meal you are in right now, and only today.
   const cur=isT?slotNow():-1,todaySigs=new Set(groupsOn(day).map(g=>mealSig(g.items))),rec=isT?againList().filter(m=>!todaySigs.has(m.sig)):[];
-  const sug=k=>{const ms=rec.filter(m=>m.slot===k).slice(0,3);return ms.length?`<div class="usual"><span class="tiny muted">Usual ${SLOT_N[k].toLowerCase()}</span>${ms.map(m=>`<button data-a="mealadd" data-sig="${esc(m.sig)}" aria-label="Add ${esc(mealName(m.items))}">${m.pin?'★ ':''}<span>${esc(mealLabel(m))}</span><small>${fmt(mealK(m.items))}</small></button>`).join('')}</div>`:''};
+  const yd=addDays(TODAY,-1),ysl=k=>{if(!isT||k>3)return '';const y=slotItems(yd,k);return y.length?`<button data-a="copyslot" data-d="${yd}" data-k="${k}" aria-label="Add yesterday's ${SLOT_N[k].toLowerCase()} again">${ic('repeat')}<span>Yesterday's: ${esc(mealLabel({items:y}))}</span><small>${fmt(mealK(y))}</small></button>`:''};
+  const sug=k=>{const ms=rec.filter(m=>m.slot===k).slice(0,3),y=gs[k].length?'':ysl(k);return ms.length||y?`<div class="usual"><span class="tiny muted">${ms.length?'Usual '+SLOT_N[k].toLowerCase():'Again?'}</span>${y}${ms.map(m=>`<button data-a="mealadd" data-sig="${esc(m.sig)}" aria-label="Add ${esc(mealName(m.items))}">${m.pin?'★ ':''}<span>${esc(mealLabel(m))}</span><small>${fmt(mealK(m.items))}</small></button>`).join('')}</div>`:''};
   const sec=k=>{const it=gs[k],kc=it.reduce((a,{e})=>a+e.k*e.x,0),pr=it.reduce((a,{e})=>a+e.pr*e.x,0),nm=SLOT_N[k];
     return `<section class="mealsec${k===cur?' cur':''}"><div class="meal"><h3>${nm}</h3>${it.length?`<span class="small muted">${fmt(kc)} kcal · ${Math.round(pr)} P</span>`:k===cur?'<span class="tiny sigt">now</span>':''}<span class="grow"></span>${k<4&&it.length?`<button class="icon-btn s" data-a="slotadd" data-k="${k}" aria-label="Add to ${nm.toLowerCase()}">${ic('plus')}</button>`:''}</div>
-     ${it.map(o=>feRow(o,day)).join('')}${!it.length&&k<4?`<button class="addrow" data-a="slotadd" data-k="${k}">${ic('plus')}Add ${nm.toLowerCase()}</button>`:''}${k===cur?sug(k):''}</section>`};
+     ${it.map(o=>feRow(o,day)).join('')}${!it.length&&k<4?`<button class="addrow" data-a="slotadd" data-k="${k}">${ic('plus')}Add ${nm.toLowerCase()}</button>`:''}${k===cur?sug(k):!it.length&&ysl(k)?`<div class="usual">${ysl(k)}</div>`:''}${!isT&&it.length&&k<4?`<button class="linkbtn" data-a="copyslot" data-d="${day}" data-k="${k}" style="margin-top:4px">Copy this ${nm.toLowerCase()} to today</button>`:''}</section>`};
   const meals=[0,1,2,3].map(sec).join('')+(gs[4].length?sec(4):'');
   const yest=isT&&!(S.food[day]||[]).some(e=>!e.auto)?copyable(groupsOn(addDays(TODAY,-1))):[];
   const B=(n,v,m,c)=>`<div><div class="row between small"><span>${n}</span><span><b class="hi">${Math.round(v)}</b><span class="muted">/${m}</span></span></div><div class="bar" style="margin-top:4px"><i style="width:${pct(v,m)}%;background:${c}"></i></div></div>`;
@@ -248,14 +251,14 @@ function vEat(){
 function circList(){return CIRCUITS.map(c=>{const b=best(c.id);return `<button class="ex" data-a="circsheet" data-id="${c.id}"><span class="thumb">${gMedia(c.st[0][2],c.st[0][0])}</span>
   <span class="grow"><b>${c.n}</b> ${c.tag?`<span class="tag v">${c.tag}</span>`:''}<br><span class="small muted">${c.type==='amrap'?c.min+' min AMRAP':c.type==='ladder'?'Pyramid ladder':c.rounds+' rounds · '+c.work+'/'+c.rest+' s'}${b!=null?` · best ${c.type==='amrap'?b+' rounds':mmss(b)+(c.type==='ladder'&&bestPeak(c.id)?' (peak '+bestPeak(c.id)+')':'')}`:''}</span></span>${ic('chevR','muted')}</button>`}).join('')}
 function vPlan(){
-  const dates=weekDates(),sel=UI.planDay&&dates.includes(UI.planDay)?UI.planDay:TODAY,p=dayForDate(sel),li=S.log.findIndex(l=>l.d===sel),done=li>=0,isT=sel===TODAY,thu=!LITE&&parse(sel).getDay()===4;
-  const strip=`<div class="week">${dates.map(d=>{const q=dayForDate(d),dn=S.log.some(l=>l.d===d),w=parse(d).getDay();
+  const wk=Math.min(0,UI.planWk||0),dates=weekDates(wk),sel=UI.planDay&&dates.includes(UI.planDay)?UI.planDay:wk?dates[6]:TODAY,p=dayForDate(sel),li=S.log.findIndex(l=>l.d===sel),done=li>=0,isT=sel===TODAY,thu=!LITE&&parse(sel).getDay()===4;
+  const strip=`<div class="row between" style="margin-bottom:-4px"><button class="icon-btn s" data-a="planwk" data-d="-1" aria-label="Week before">${ic('chevL')}</button><span class="tiny muted">${wk?fmtDate(dates[0])+' – '+fmtDate(dates[6]):'This week'}</span>${wk?`<button class="icon-btn s" data-a="planwk" data-d="1" aria-label="Week after">${ic('chevR')}</button>`:'<span style="width:32px"></span>'}</div><div class="week">${dates.map(d=>{const q=dayForDate(d),dn=S.log.some(l=>l.d===d),w=parse(d).getDay();
     return `<button class="day${d===sel?' sel':''}${dn?' done':''}${!q&&!dn?' rest':''}${d===TODAY?' today':''}${q&&!dn&&d<TODAY?' miss':''}" data-a="planday" data-d="${d}" aria-label="${fmtDate(d)}${q?', '+q.name:', rest'}${dn?', done':''}"><span class="d">${DOW[w]}</span><span class="s">${q?shortName(q):dn?'DONE':w===4&&!LITE?'CIRC':'REST'}</span></button>`}).join('')}</div>`;
   let card;const past=sel<TODAY,dn3=DOW[parse(sel).getDay()],moved=past&&!done&&!p&&S.resched[sel]===null?S.program.find(x=>x.dow===parse(sel).getDay()):null;
   if(p){const nSets=p.ex.reduce((a,e)=>a+e.s,0);
     card=`<div class="card stack"><div class="row between" style="align-items:flex-start"><div><p class="label">${isT?'Today':fmtDate(sel)}${done?' · done':past?' · not logged':''}</p><h2 class="${nameCls(p.name)}" style="margin-top:4px">${esc(p.name)}</h2></div><span class="small muted" style="text-align:right">${p.ex.length} exercises<br>~${Math.round(nSets*3.5+10)} min</span></div>
      <div>${p.ex.map(e=>{const d=def(e.x),h=lastFor(d.id);return `<button class="ex" data-a="exinfo" data-id="${d.id}"><span class="thumb">${exMedia(d.id)}</span><span class="grow"><b>${esc(d.n)}</b><br><span class="small muted">${e.s} × ${d.r[0]}–${d.r[1]}${h?' · last '+lastTxt(h):''}</span></span>${ic('chevR','muted')}</button>`}).join('')}</div>
-     <div class="row">${done?`<button class="btn grow" data-a="wlog" data-li="${li}">See what you logged</button>`:past?`<button class="btn primary grow" data-a="startday" data-id="${p.id}" data-d="${sel}">Log it for ${dn3}</button>`:`<button class="btn ${isT?'cta':'primary'} grow" data-a="startday" data-id="${p.id}">${isT?'Start session':'Start it today'}</button>`}<button class="btn" data-a="editday" data-id="${p.id}">Edit</button></div>
+     <div class="row">${done?`<button class="btn grow" data-a="wlog" data-li="${li}">See what you logged</button>`:past?`<button class="btn primary grow" data-a="startday" data-id="${p.id}" data-d="${sel}">Log it for ${dn3}</button>`:`<button class="btn ${isT?'cta':'primary'} grow" data-a="startday" data-id="${p.id}">${isT?'Start session':'Start it today'}</button>`}<button class="btn" data-a="editday" data-id="${p.id}">${done?'Edit plan':'Edit'}</button></div>
      ${past&&!done?`<button class="linkbtn" data-a="startday" data-id="${p.id}" style="align-self:flex-start">Or do it today instead</button>`:''}
      ${isT&&!done?`<button class="linkbtn" data-a="resched" data-d="${TODAY}" style="align-self:flex-start">Can't make it today?</button>`:''}</div>`}
   else card=`<div class="card stack"><div><p class="label">${isT?'Today':fmtDate(sel)}</p><h2 style="margin-top:4px">${done?'Extra session':moved?'Moved':thu?'Circuit day':'Rest'}</h2></div>
@@ -283,7 +286,7 @@ function vReps(){
      ${done.length?`<div class="row wrap" style="gap:6px">${done.map((v,i)=>`<button class="chip" data-a="gtgrm" data-m="${m.id}" data-i="${i}" aria-label="Remove the set of ${v}">${v}${m.u==='s'?' s':''} <span class="muted">×</span></button>`).join('')}<span class="tiny muted" style="align-self:center">tap a set to remove it</span></div>`:''}
      ${skip?'<p class="small" style="color:var(--warn);font-weight:700">Trained in the gym today. Skip or go very light.</p>':''}
      ${m.u==='s'&&UI.ht&&UI.ht.m===m.id?holdTimer(sz)
-      :`<div class="row">${m.u==='s'?`<button class="btn sm cta grow" data-a="htstart" data-m="${m.id}">${ic('play')} Start timer</button>`:''}<input class="num" id="gtg-${m.id}" type="number" inputmode="numeric" value="${sz}" aria-label="${m.n} ${m.u==='s'?'seconds':'reps'}" style="width:${m.u==='s'?64:76}px;padding:7px"><button class="btn sm ${m.u==='s'?'':'primary grow'}" data-a="gtglog" data-m="${m.id}">${m.u==='s'?'Log':'Log set'}</button>${done.length?`<button class="btn sm ghost" data-a="gtgundo" data-m="${m.id}" aria-label="Undo last set">Undo</button>`:''}</div>`}
+      :`${m.u==='s'?`<button class="btn sm cta block" data-a="htstart" data-m="${m.id}">${ic('play')} Start timer</button>`:''}<div class="row"><input class="num${m.u==='s'?' grow':''}" id="gtg-${m.id}" type="number" inputmode="numeric" min="1" value="${sz}" aria-label="${m.n} ${m.u==='s'?'seconds, or type them':'reps'}" style="${m.u==='s'?'':'width:76px;flex:none;'}padding:7px"><button class="btn sm ${m.u==='s'?'':'primary grow'}" data-a="gtglog" data-m="${m.id}" style="flex-shrink:0">${m.u==='s'?'Log':'Log set'}</button>${done.length?`<button class="btn sm ghost" data-a="gtgundo" data-m="${m.id}" aria-label="Undo last set" style="flex-shrink:0">Undo</button>`:''}</div>`}
     </div></div>`}).join('')||'<p class="small muted">No moves in rotation. Pick some below.</p>'}</div>
    <div class="stack" style="gap:8px"><div class="row between"><p class="label">Records</p><span class="tiny muted">tap to test</span></div>${prTiles()}</div>
    <div class="card stack"><p class="label">Moves in rotation</p><div class="row wrap" style="gap:6px">${myMoves().map(m=>`<button class="chip${S.gtg.on.includes(m.id)?' on':''}" data-a="gtgtoggle" data-m="${m.id}">${m.n}</button>`).join('')}</div></div>`}
@@ -354,7 +357,7 @@ function ghostLanes(x,h,si,exDone){const d=def(x.id);
   const bot=cols.map(i=>{const z=x.sets[i],g=h.sets[i];if(!z)return '<span class="c off">–</span>';
     if(z.done){const c=g?ghostCmp(d,z,g):2;return `<span class="c ${c>0?'up':c<0?'dn':'eq'}">${cell(+z.kg||0,z.reps)}<b>${c===2?'+':c>0?'▲':c<0?'▼':'='}</b></span>`}
     return i===si&&!exDone?'<span class="c now">now</span>':'<span class="c off">·</span>'}).join('');
-  return `<div class="glanes${n>=5?' tight':''}" style="--n:${n}" role="img" aria-label="Last time against today, set by set"><span class="who">${dShort(h.d)}</span>${top}<span class="who">Today</span>${bot}</div>`}
+  return `<div class="glanes${n>=5?' tight':''}${n>=6?' vtight':''}" style="--n:${n}" role="img" aria-label="Last time against today, set by set"><span class="who">${dShort(h.d)}</span>${top}<span class="who">Today</span>${bot}</div>`}
 // List mode: the same lanes on each exercise card, filled in as you tick sets.
 function ghostCard(x,sg){const h=ghostOn()?ghostOf(x):null;if(!h)return `<p class="hint">${sg.txt}</p>`;
   const si=x.sets.findIndex(s=>!s.done),t=ghostTally([x]),line=t.w+t.l+t.t+t.bonus?ghostSum(t):`Beat last time's sets, one by one. ${sg.txt}`;
@@ -428,7 +431,7 @@ function vWorkoutList(){
       <input class="num" type="number" inputmode="decimal" step="0.5" value="${s.kg}" data-c="setkg" data-x="${xi}" data-i="${i}" aria-label="${esc(d.n)} set ${i+1} kg">
       <input class="num" type="number" inputmode="numeric" placeholder="${d.r[0]}–${d.r[1]}" value="${s.reps}" data-c="setreps" data-x="${xi}" data-i="${i}" aria-label="${esc(d.n)} set ${i+1} reps">
       <button class="check${s.done?' done':''}" data-a="toggleset" data-x="${xi}" data-i="${i}" aria-label="Mark set ${i+1} done">${I.check}</button></div>${UI.tip===xi+'-'+i?`<p class="settip">${setTip(x,xi,i)}</p>`:''}`).join('')}</div>
-    <div class="row"><button class="btn sm ghost" data-a="addset" data-x="${xi}">+ Set</button>${x.sets.length>1?`<button class="btn sm ghost" data-a="rmset" data-x="${xi}">− Set</button>`:''}<span class="grow"></span>${lastFor(x.id)&&x.sets.some(s=>!s.done)?`<button class="btn sm ghost" data-a="samelast" data-x="${xi}" aria-label="Fill with last session's weights and reps">↺ Last time</button>`:''}<button class="btn sm" data-a="swapopen" data-mode="active" data-x="${xi}">Swap</button></div>
+    <div class="row wrap"><button class="btn sm ghost" data-a="addset" data-x="${xi}">+ Set</button>${x.sets.length>1?`<button class="btn sm ghost" data-a="rmset" data-x="${xi}">− Set</button>`:''}<span class="grow"></span>${lastFor(x.id)&&x.sets.some(s=>!s.done)?`<button class="btn sm ghost" data-a="samelast" data-x="${xi}" aria-label="Fill with last session's weights and reps">↺ Last time</button>`:''}<button class="btn sm" data-a="swapopen" data-mode="active" data-x="${xi}">Swap</button></div>
    </div>`}).join('')}
    <button class="btn block" data-a="swapopen" data-mode="activeadd">+ Add exercise</button>
    <p class="small muted">Swaps are today only unless you turn on <b>Also save to plan</b> in the swap sheet.</p>
