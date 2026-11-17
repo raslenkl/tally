@@ -466,6 +466,9 @@ function trendNow(){const s=trendSeries();return s.length?s[s.length-1].t:null}
 const W=()=>{const s=trendSeries(),l=s[s.length-1];return l&&!l.sample?l.t:S.profile.startKg||74};
 // Supplements shown and reminded. Old data has no list: it keeps all four.
 const hasSupp=k=>!LITE&&(!Array.isArray(S.profile.supps)||S.profile.supps.includes(k));
+// Taken, or skipped on purpose for that day (sp.sk). Either way nothing nags about it any more.
+const suppOK=(sp,k)=>!!(sp&&(sp[k]||(sp.sk&&sp.sk[k])));
+const suppSkipped=(sp,k)=>!!(sp&&!sp[k]&&sp.sk&&sp.sk[k]);
 function weeklyRate(){const s=trendSeries();if(s.length<2)return null;const last=s[s.length-1];const ref=s.filter(x=>diffDays(x.d,last.d)>=6).pop()||s[0];const days=diffDays(ref.d,last.d);if(days<3)return null;return (last.t-ref.t)/days*7}
 const dayFood=d=>(S.food[d]||[]);
 const sumFood=d=>dayFood(d).reduce((a,e)=>({k:a.k+e.k*e.x,pr:a.pr+e.pr*e.x,c:a.c+e.c*e.x,f:a.f+e.f*e.x,fi:a.fi+(e.fi||0)*e.x}),{k:0,pr:0,c:0,f:0,fi:0});
@@ -541,8 +544,12 @@ function slots(){const r=S.gtg.remind,a=toMin(r.start),b=toMin(r.end),o=[];for(l
 // Rep reminders: the next one comes `every` minutes after your LAST logged set, inside your window.
 // Skip a whole morning and you still get one reminder, not four.
 function gtgMark(){S.gtg.last={d:TODAY,m:nowMin()}}
+function logRep(m,v,quiet){const g=gtgDay(TODAY),prev=S.gtg.last;(g[m]=g[m]||[]).push(v);gtgMark();const pr=BIG3.some(b=>b[0]===m)&&maybePR(m,v,'set');save();render();buzz(pr?[40,60,40]:30);
+  if(quiet)return;toast((pr?'New record: ':'')+moveTxt(m,v)+(pr?'':' logged'),()=>{const a=gtgDay(TODAY)[m]||[],i=a.lastIndexOf(v);if(i>=0){a.splice(i,1);unPR(m,TODAY,v)}S.gtg.last=prev;save();render()})}
+// Sets done today, any move. Daily reps are usually one move at a time, so every set counts toward the day.
+const repSetsToday=()=>{const g=gtgDay(TODAY);return S.gtg.on.reduce((a,id)=>a+(g[id]||[]).length,0)};
 // Once the window has closed for the day, nothing is due (even if no set was logged): the next one is tomorrow's first.
-function gtgNext(){const r=S.gtg.remind,a=toMin(r.start),b=toMin(r.end),l=S.gtg.last;if(nowMinD()>b)return null;const m=l&&l.d===TODAY?Math.max(a,l.m+r.every):a;return m<=b?m:null}
+function gtgNext(){const r=S.gtg.remind,a=toMin(r.start),b=toMin(r.end),l=S.gtg.last;if(nowMinD()>b)return null;if(repSetsToday()>=(S.gtg.sets||6))return null;const m=l&&l.d===TODAY?Math.max(a,l.m+r.every):a;return m<=b?m:null}
 const everyTxt=v=>v<120?v+' min':(v/60)+' h';
 function ramadanOn(d=TODAY){const r=S.profile.ramadan;return r==='on'||(r==='auto'&&isRamadanDay(d))}
 // Iftar = sunset (+1 min), suhoor ends at dawn (sun 18° below the horizon; 20° in Malaysia, as JAKIM uses).
@@ -837,16 +844,16 @@ function overHTML(){
   const el=Math.floor((Date.now()-r.t0)/1000);
   if(r.phase==='done'){const score=c.type==='amrap'?r.rounds+' rounds':mmss(r.score),cut=c.type==='ladder'&&r.step<r.seq.length;return `<div class="over"><div class="inner" style="justify-content:center;text-align:center"><p class="label">${cut?'Stopped early':'Done'}</p><h1 style="font-size:64px">${c.n}</h1><div class="clock" style="font-size:96px">${score}</div>${cut?`<p class="muted">Round ${r.step+1} of ${r.seq.length}. A pyramid only counts as a result when you finish it, so this one is not saved.</p>`:''}${c.id==='cindy'?`<p class="muted">Tom Holland's reported best: 27 rounds.</p>`:''}<button class="btn primary block" data-a="runclose">Close</button></div></div>`}
   if(c.type==='amrap'){const left=Math.max(0,Math.ceil((r.end-Date.now())/1000));return `<div class="over work"><div class="inner">
-    <div class="row between"><p class="label">${c.n} · ${c.min} min AMRAP</p><button class="btn sm" data-a="runfinish">End</button></div>
+    <div class="row between"><p class="label">${c.n} · ${c.min} min AMRAP</p><button class="btn sm" data-a="runfinish" data-arm="1">End</button></div>
     <div class="clock">${Math.floor(left/60)}:${pad(left%60)}</div>
     <div class="moves">${c.st.map(([n,reps,g])=>`<div>${gMedia(g,n)}<b>${reps}</b><span class="small">${n}</span></div>`).join('')}</div>
     <div class="row between"><span class="label">Rounds</span><span class="num" style="font-size:56px">${r.rounds}</span></div>
     <button class="btn big block" data-a="amrapround">+1 round</button>${r.rounds?`<button class="btn sm" data-a="amrapundo">Undo round</button>`:''}</div></div>`}
   if(c.type==='ladder'){const seq=r.seq,k=seq[r.step];return `<div class="over work"><div class="inner">
-    <div class="row between"><p class="label">Round ${r.step+1}/${seq.length} · ${Math.floor(el/60)}:${pad(el%60)}</p><button class="btn sm" data-a="runfinish">End</button></div>
+    <div class="row between"><p class="label">Round ${r.step+1}/${seq.length} · ${Math.floor(el/60)}:${pad(el%60)}</p><button class="btn sm" data-a="runfinish" data-arm="1">End</button></div>
     <h1 style="font-size:52px">Round ${r.step+1}</h1>
     <div class="moves">${c.st.map(([n,mult,g])=>`<div>${gMedia(g,n)}<b>${mult*k}</b><span class="small">${n}</span></div>`).join('')}</div>
-    <div class="ladder">${seq.map((_,i)=>`<i class="${i<r.step?'ok':''}" style="${i<r.step?'background:var(--accent-ink)':''}"></i>`).join('')}</div>
+    <div class="skladder">${seq.map((_,i)=>`<i class="${i<r.step?'ok':''}" style="${i<r.step?'background:var(--accent-ink)':''}"></i>`).join('')}</div>
     <button class="btn big block" data-a="ladnext">Round done</button></div></div>`}
   const st=c.st[r.i],left=Math.max(0,Math.ceil((r.end-Date.now())/1000));
   const work=r.phase==='work',next=r.phase==='ready'?c.st[0]:r.i+1<c.st.length?c.st[r.i+1]:c.st[0];
@@ -1009,7 +1016,8 @@ function sheetHTML(){
   if(s.kind==='remind'){const r=S.gtg.remind;body=`<h2>Rep windows</h2>
    <div class="grid2"><div class="field"><label class="label" for="rS">First</label><input id="rS" type="time" value="${r.start}" data-c="remind" data-f="start"></div><div class="field"><label class="label" for="rE">Last</label><input id="rE" type="time" value="${r.end}" data-c="remind" data-f="end"></div></div>
    <div class="field"><span class="label">Gap after each set</span><div class="seg">${[60,90,120,180].map(v=>`<button class="${r.every===v?'on':''}" data-a="remindevery" data-v="${v}">${v<120?v+' min':v/60+' h'}</button>`).join('')}</div></div>
-   <p class="small muted">The first reminder comes at "First". After that, each one comes ${everyTxt(r.every)} after the last set you log, so nothing piles up while you're busy. ${hook('gtgNote')}</p>`}
+   <div class="field"><span class="label">Sets a day, any move</span><div class="seg">${[4,6,8,10].map(v=>`<button class="${(S.gtg.sets||6)===v?'on':''}" data-a="gtgsets" data-v="${v}">${v}</button>`).join('')}</div></div>
+   <p class="small muted">The first reminder comes at "First". After that, each one comes ${everyTxt(r.every)} after the last set you log, so nothing piles up while you're busy. Reminders stop for the day once you've done ${S.gtg.sets||6} sets. ${hook('gtgNote')}</p>`}
   if(s.kind==='circ'){const c=CIRCUITS.find(x=>x.id===s.id),o=s.o;
    body=`<div class="row" style="gap:6px"><h2>${c.n}</h2>${c.tag?`<span class="tag v">${c.tag}</span>`:''}</div><p class="small muted">${c.d}</p>
    <div class="list">${c.st.map(([n,reps,g])=>`<div class="li"><div class="figbox" style="width:64px">${gMedia(g,n)}</div><span class="grow"><b>${n}</b></span>${c.type!=='timed'?`<span class="num" style="font-size:22px">${c.type==='ladder'?reps+'×':reps}</span>`:''}</div>`).join('')}</div>
@@ -1018,7 +1026,8 @@ function sheetHTML(){
    ${c.type==='ladder'?`<div class="field"><span class="label">Peak round</span><div class="seg">${[5,7,10].map(v=>`<button class="${o.peak===v?'on':''}" data-a="circopt" data-k="peak" data-v="${v}">${v}${v===10?' (full)':v===5?' (half)':''}</button>`).join('')}</div></div>
      <p class="small muted">Peak ${o.peak}: ${o.peak*o.peak} pull-ups, ${o.peak*o.peak*2} dips, ${o.peak*o.peak*3} push-ups, ${o.peak*o.peak*4} sit-ups, ${o.peak*o.peak*5} squats in total.</p>`:''}
    ${c.type==='timed'?[['work','Work (s)',[30,40,45,60]],['rest','Rest (s)',[10,15,20,30]],['rounds','Rounds',[2,3,4,5]]].map(([k,l,opts])=>`<div class="field"><span class="label">${l}</span><div class="seg">${opts.map(v=>`<button class="${o[k]===v?'on':''}" data-a="circopt" data-k="${k}" data-v="${v}">${v}</button>`).join('')}</div></div>`).join(''):''}
-   <button class="btn primary block" data-a="runstart">Start</button>`}
+   <button class="btn primary block" data-a="runstart">Start</button>
+   ${(()=>{const h=S.circLog.map((x,i)=>({...x,i})).filter(x=>x.id===c.id).slice(-6).reverse();return h.length?`<p class="label" style="margin-top:4px">Your results</p><div class="row wrap" style="gap:6px">${h.map(x=>`<button class="chip" data-a="circdel" data-i="${x.i}" aria-label="Delete this result">${fmtDate(x.d)} · ${c.type==='amrap'?x.score+' rounds':mmss(x.score)}${x.peak?' (peak '+x.peak+')':''} <span class="muted">×</span></button>`).join('')}<span class="tiny muted" style="align-self:center">tap one to delete it</span></div>`:''})()}`}
   if(s.kind==='sk')body=skSheet(s);
   if(s.kind==='recap')body=recapSheet(s);
   if(s.kind==='bigph'){const d=def(s.id);body=`${exMedia(s.id,'big')}<h2>${esc(d.n)}</h2><p class="small muted">${Object.keys(d.m).map(k=>MUSC[k]).join(', ')} · ${d.r[0]}–${d.r[1]} reps</p><ul class="cues">${(CUES[d.g]||[]).map(c=>`<li>${c}</li>`).join('')}</ul>${NOTES[s.id]?`<p class="small">${NOTES[s.id]}</p>`:''}`}
@@ -1294,24 +1303,42 @@ function vSkills(){
     <p class="small muted">${rk.next?`${rk.next[0]-rk.x} XP to ${rk.next[1]}. `:''}Harder skills give more XP. Pull-ups and dips you log anywhere in the app count automatically.</p>
    </div>
    ${f?`<button class="card stack" data-a="sknode" data-id="${f.id}" style="text-align:left;width:100%"><div class="row between"><p class="label">Your focus</p><span class="tag v">${brOf(f).n}</span></div><h3>${f.n} · ${stdTxt(f)}</h3>${skBar(f)}</button>`:''}
-   ${upNext()}
-   <div class="seg">${[['map','Whole tree'],['branch','One branch']].map(([k,l])=>`<button class="${(UI.skView||'map')===k?'on':''}" data-a="skview" data-v="${k}">${l}</button>`).join('')}</div>
-   ${(UI.skView||'map')==='map'?`<div class="card stack">${vSkillMap(false)}</div>${UI.mapFS?vSkillMap(true):''}`:`<div class="brs">${BR.map(x=>{const ns=x.nodes.map(n=>n[0]),d=ns.filter(id=>ST[id]==='done').length;return `<button class="${x.id===b.id?'on':''}" data-a="skbr" data-b="${x.id}"><b>${x.n}</b><small>${d}/${ns.length}${!d&&ST[ns[0]]==='locked'?' · locked':''}</small><div class="bar"><i style="width:${d/ns.length*100}%"></i></div></button>`}).join('')}</div>
-   <div class="card stack">
-    <div class="row between"><div><p class="label">Goal</p><h3>${b.goal}</h3></div><span class="num" style="font-size:22px">${nDone}/${nodes.length}</span></div>
-    ${firstReq.length?`<p class="hint">This branch opens after: ${firstReq.map(r=>`<b>${SKI[r].n}, ${stdTxt(SKI[r])}</b> (${brOf(SKI[r]).n})`).join(' and ')}.</p>`:''}
-    <div class="tree" style="height:${H}px">
-     <svg viewBox="0 0 100 ${H}" preserveAspectRatio="none" aria-hidden="true">
-      <path d="${pathTo(nodes.length-1)}" fill="none" stroke="var(--line)" stroke-width="6" stroke-linecap="round" stroke-dasharray="1 11" vector-effect="non-scaling-stroke"/>
-      ${nDone?`<path d="${pathTo(Math.min(nDone,nodes.length-1))}" fill="none" stroke="var(--accent)" stroke-width="6" stroke-linecap="round" vector-effect="non-scaling-stroke"/>`:''}
-     </svg>
-     ${nodes.map((o,i)=>{const s=ST[o.id],bst=skBest(o),p=s==='done'?1:Math.min(1,bst.v/o.v);
-      return `<button class="sknode ${s}${o===front?' front':''}" style="left:${X(i)}%;top:${Y(i)}px" data-a="sknode" data-id="${o.id}" aria-label="${esc(o.n)}, ${stdTxt(o)}, ${s==='done'?'mastered':s==='locked'?'locked':'open'}">
-       <span class="disc" style="--p:${s==='locked'?0:p}"><span>${s==='done'?I.check:s==='locked'?LOCK:discTxt(o)}</span></span>${S.sk.focus===o.id?'<span class="fb">focus</span>':''}
-       <span class="sklbl ${X(i)>55?'l':'r'}"><b>${o.n}</b><small>${stdTxt(o)} · Lv ${o.tier}${s==='open'&&bst.v?` · best ${bst.v}`:''}</small>${(o.req||[]).map(r=>`<span class="sklink">← needs ${esc(SKI[r].n)} (${brOf(SKI[r]).n})</span>`).join('')}${SKN.filter(c=>c.br!==o.br&&(c.req||[]).includes(o.id)).map(c=>`<span class="sklink">→ opens ${esc(c.n)} (${brOf(c).n})</span>`).join('')}</span></button>`}).join('')}
-    </div>
-   </div>`}`;
+   ${skCons()}
+   ${skRoutes()}`;
 }
+// Where a branch stands: done count, the skill you're on (first open one), and what it waits for if nothing is open.
+function brInfo(b){const ns=b.nodes.map(n=>SKI[n[0]]),d=ns.filter(o=>ST[o.id]==='done').length,front=ns.find(o=>ST[o.id]==='open');
+  const k=front?'open':d===ns.length?'done':'locked',wait=k==='locked'?[...new Set(ns.flatMap(o=>(o.req||[]).filter(r=>ST[r]!=='done')))].slice(0,2):[];
+  return {ns,d,front,k,wait,p:front?Math.min(1,skBest(front).v/front.v):0}}
+// The whole tree as one picture: Start in the middle, one spoke per branch, rings are steps along it.
+// Lit dots are mastered, the ringed dot is the skill you're on. Tap a spoke to open that branch below.
+function skCons(){const n=BR.length,R0=34,step=8.4,ang=i=>-Math.PI/2+i*2*Math.PI/n,P=(i,r)=>[+(r*Math.cos(ang(i))).toFixed(1),+(r*Math.sin(ang(i))).toFixed(1)];
+  const total=SKN.filter(o=>ST[o.id]==='done').length,rings=[0,2,4,6,8].map(k=>`<circle r="${R0+k*step}" fill="none" stroke="var(--line)" stroke-width=".6"/>`).join('');
+  const spokes=BR.map((b,i)=>{const I=brInfo(b),L=b.nodes.length,on=UI.skOpen===b.id,end=P(i,R0+(L-1)*step),lit=I.d?P(i,R0+(I.d-1)*step):null,lab=P(i,R0+(L-1)*step+9),a=ang(i),c=Math.cos(a);
+    const dots=I.ns.map((o,j)=>{const [x,y]=P(i,R0+j*step),st=ST[o.id];return st==='done'?`<circle cx="${x}" cy="${y}" r="3.4" fill="var(--accent)"/>`
+      :o===I.front?`<circle cx="${x}" cy="${y}" r="4" fill="var(--surface)" stroke="var(--accent)" stroke-width="1.6"/>`:`<circle cx="${x}" cy="${y}" r="2.3" fill="var(--surface)" stroke="var(--line2)" stroke-width="1"/>`}).join('');
+    return `<g class="spoke${on?' on':''}${I.k==='locked'?' lk':''}" data-a="skroute" data-b="${b.id}" role="button" aria-label="${esc(b.n)}: ${I.d} of ${L}">
+     <line x1="0" y1="0" x2="${end[0]}" y2="${end[1]}" stroke="transparent" stroke-width="16"/>
+     <line x1="${P(i,R0-6)[0]}" y1="${P(i,R0-6)[1]}" x2="${end[0]}" y2="${end[1]}" stroke="${on?'var(--hi)':'var(--line2)'}" stroke-width="${on?1.4:1}"/>
+     ${lit?`<line x1="0" y1="0" x2="${lit[0]}" y2="${lit[1]}" stroke="var(--accent)" stroke-width="2.6" stroke-linecap="round"/>`:''}${dots}
+     <text x="${lab[0]}" y="${lab[1]+2.5}" text-anchor="${Math.abs(c)<.25?'middle':c>0?'start':'end'}" class="sptx">${esc(b.n)}</text></g>`}).join('');
+  return `<div class="card stack cons"><div class="row between"><h3>Your tree</h3><span class="tiny muted">${total}/${SKN.length} mastered</span></div>
+   <svg viewBox="-126 -128 252 234" role="img" aria-label="Skill tree: ${BR.length} branches from the middle out">${rings}${spokes}<circle r="11" fill="var(--accent)"/><text y="4" text-anchor="middle" class="sptx c">${total}</text></svg>
+   <div class="row wrap tiny muted" style="gap:12px;justify-content:center"><span><i class="lg on"></i>mastered</span><span><i class="lg cur"></i>you're on it</span><span><i class="lg"></i>to come</span><span>tap a branch</span></div></div>`}
+// Every branch as one row (the ones you can work on first), each opens into a full-width ladder.
+function skRoutes(){const rows=BR.map(b=>({b,I:brInfo(b)})),ord={open:0,done:1,locked:2};rows.sort((x,y)=>ord[x.I.k]-ord[y.I.k]||y.I.p-x.I.p);
+  return `<div class="card routes">${rows.map(({b,I})=>{const on=UI.skOpen===b.id;
+   const sub=I.k==='open'?`Next: ${esc(I.front.n)} · ${stdTxt(I.front)}`:I.k==='done'?'Mastered':`Opens after ${I.wait.map(r=>esc(SKI[r].n)).join(' and ')}`;
+   return `<div class="route ${I.k}${on?' on':''}" id="rt-${b.id}"><button class="rhead" data-a="skroute" data-b="${b.id}" aria-expanded="${on}">
+     <span class="grow" style="min-width:0"><b class="hi">${esc(b.n)}</b><span class="small muted rsub">${sub}</span></span>
+     <span class="rdots" aria-hidden="true">${I.ns.map(o=>`<i class="${ST[o.id]==='done'?'on':o===I.front?'cur':''}"></i>`).join('')}</span><span class="tiny muted" style="width:26px;text-align:right">${I.d}/${I.ns.length}</span></button>
+    ${on?skLadder(b,I):''}</div>`}).join('')}</div>`}
+const CHK='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" width="18" height="18"><path d="M5 12l5 5L20 7"/></svg>';
+function skLadder(b,I){return `<div class="skladder"><p class="small muted" style="margin:0 0 8px 46px">Goal: <b class="hi">${esc(b.goal)}</b></p>${I.ns.map((o,i)=>{const s=ST[o.id],bst=skBest(o),p=s==='done'?1:Math.min(1,bst.v/o.v),cur=o===I.front;
+  const needs=(o.req||[]).map(r=>`<span class="sklink${ST[r]==='done'?' ok':''}">needs ${esc(SKI[r].n)} (${esc(brOf(SKI[r]).n)})</span>`).join(''),opens=SKN.filter(c=>c.br!==o.br&&(c.req||[]).includes(o.id)).map(c=>`<span class="sklink">opens ${esc(c.n)} (${esc(brOf(c).n)})</span>`).join('');
+  return `<button class="lstep ${s}${cur?' cur':''}" data-a="sknode" data-id="${o.id}" aria-label="${esc(o.n)}, ${stdTxt(o)}, ${s==='done'?'mastered':s==='locked'?'locked':'open'}">
+   <span class="disc sm" style="--p:${s==='locked'?0:p}"><span>${s==='done'?CHK:s==='locked'?LOCK:o.tier+'<small>lv</small>'}</span></span>
+   <span class="grow" style="min-width:0"><b>${esc(o.n)}</b>${S.sk.focus===o.id?' <span class="tag v">focus</span>':''}<span class="small muted" style="display:block">${stdTxt(o)} · Lv ${o.tier} · +${o.tier*10} XP${s!=='done'&&bst.v?` · best ${bst.v}`:''}</span>${needs}${opens}</span></button>`}).join('')}</div>`}
 // The skills you can work on right now: the first open skill of every branch, closest to done first.
 function upNext(){const f=S.sk.focus,all=BR.map(b=>b.nodes.map(n=>SKI[n[0]]).find(o=>ST[o.id]==='open')).filter(o=>o&&o.id!==f)
     .map(o=>({o,p:Math.min(1,skBest(o).v/o.v)})).sort((a,b)=>b.p-a.p||a.o.tier-b.o.tier);
@@ -1400,6 +1427,7 @@ function missedYesterday(){const y=addDays(TODAY,-1),p=dayForDate(y);if(!p||y<S.
 
 /* ===================== Monthly recap ===================== */
 const MON=['January','February','March','April','May','June','July','August','September','October','November','December'];
+function recapMonthsTrained(){return recapMonths().filter(m=>S.log.some(l=>l.d.startsWith(m))||Object.keys(S.gtg.days).some(d=>d.startsWith(m)&&Object.values(S.gtg.days[d]).some(a=>a&&a.length)))}
 function recapMonths(){const s=new Set();S.log.forEach(l=>s.add(l.d.slice(0,7)));S.weights.filter(w=>!w.sample).forEach(w=>s.add(w.d.slice(0,7)));Object.keys(S.gtg.days).forEach(d=>{const g=S.gtg.days[d];if(Object.values(g).some(a=>a&&a.length))s.add(d.slice(0,7))});return [...s].sort().reverse()}
 function recap(ym){
   const inM=d=>d&&d.startsWith(ym),logs=S.log.filter(l=>inM(l.d));let sets=0,ton=0;
@@ -1676,7 +1704,11 @@ const A={
  // calisthenics
  // Mistyped set in daily reps: tap it to remove it (undo puts it back).
  gtgrm:t=>{if(tapTwice())return;const m=t.dataset.m,i=+t.dataset.i,g=gtgDay(TODAY),arr=g[m];if(!arr||arr[i]==null)return;const v=arr.splice(i,1)[0],pr=(S.gtg.max[m]||[]).find(x=>x.src==='set'&&x.d===TODAY&&x.v===v);unPR(m,TODAY,v);save();render();const rec={k:'gtg',d:TODAY,m,v,i,pr:pr&&!(S.gtg.max[m]||[]).includes(pr)?pr:null};toast('Removed '+moveTxtS(m,v),()=>HIST_DO.gtg(rec),null,rec)},
- gtglog:t=>{const m=t.dataset.m,v=parseInt($('#gtg-'+m).value);if(!(v>0))return toast('Enter how many you did');const g=gtgDay(TODAY);(g[m]=g[m]||[]).push(v);gtgMark();const pr=BIG3.some(b=>b[0]===m)&&maybePR(m,v,'set');save();render();buzz(pr?[40,60,40]:30);toast(pr?'New record: '+v+(m==='plank'?' s ':' ')+MOVES.find(x=>x.id===m).n.toLowerCase():v+' '+MOVES.find(x=>x.id===m).n.toLowerCase()+' logged')},
+ gtglog:t=>{const m=t.dataset.m,v=parseInt($('#gtg-'+m).value);if(!(v>0))return toast('Enter how many you did');logRep(m,v)},
+ gtgsets:t=>{S.gtg.sets=+t.dataset.v;save();renderSheet();render()},
+ gtgquick:t=>{const m=t.dataset.m;if(UI.sheet&&UI.sheet.kind==='repset')UI.sheet=null;logRep(m,setSize(m))},
+ suppskip:t=>{const k=t.dataset.k,s=S.supps[TODAY]=S.supps[TODAY]||{};if(s[k])return;s.sk={...(s.sk||{}),[k]:1};save();render();buzz(15);
+   toast({fe:'Iron',mg:'Magnesium',cr:'Creatine'}[k]+' skipped today',()=>{const z=S.supps[TODAY]||{};if(z.sk){delete z.sk[k];if(!Object.keys(z.sk).length)delete z.sk}save();render()})},
  maxrm:t=>{const a=S.gtg.max[t.dataset.m]||[],i=+t.dataset.i,v=a.splice(i,1)[0];if(!v)return;save();render();toast('Max deleted',()=>{a.splice(i,0,v);save();render()})},
  gtgundo:t=>{const m=t.dataset.m,g=gtgDay(TODAY),v=(g[m]||[]).pop();if(v!=null)unPR(m,TODAY,v);save();render()},
  gtgtoggle:t=>{const m=t.dataset.m,on=S.gtg.on,i=on.indexOf(m);i>=0?on.splice(i,1):on.push(m);save();render()},
@@ -1699,6 +1731,8 @@ const A={
  mapfit:()=>{UI.mvFit&&UI.mvFit()},
  mapzoom:t=>{const Z=[.45,.7,1],o=UI.mapZoom||1,n=Z[Math.max(0,Math.min(2,Z.indexOf(o)+ +t.dataset.d))];const w=document.getElementById('skmapwrap');
   if(w){const cx=(w.scrollLeft+w.clientWidth/2)/o,cy=(w.scrollTop+w.clientHeight/2)/o;UI.mapScroll=[cx*n-w.clientWidth/2,cy*n-w.clientHeight/2]}UI.mapZoom=n;render()},
+ // A branch opens (or closes) under its row; from the picture, the page scrolls to it.
+ skroute:t=>{const id=t.dataset.b,from=t.tagName!=='BUTTON';UI.skOpen=UI.skOpen===id&&!from?null:id;S.sk.br=id;render();if(from){const r=document.getElementById('rt-'+id);if(r)r.scrollIntoView({behavior:'smooth',block:'start'})}},
  sknode:t=>{const o=SKI[t.dataset.id];UI.hold=null;UI.sheet={kind:'sk',id:o.id};renderSheet()},
  skhold:()=>{const id=UI.sheet.id;if(UI.hold&&UI.hold.id===id){const v=Math.round((Date.now()-UI.hold.t0)/100)/10;UI.hold=null;UI.sheet.v=v;beep(660,160);renderSheet()}else{UI.hold={id,t0:Date.now()};beep(1040,200);renderSheet()}},
  sklog:()=>{const o=SKI[UI.sheet.id],v=parseFloat($('#skV').value),kg=o.t==='wt'?parseFloat($('#skKg').value)||0:undefined;if(!(v>0))return toast(o.t==='hold'?'Enter the seconds held':'Enter how many reps');
@@ -1726,7 +1760,7 @@ const A={
  skunmanual:t=>{delete S.sk.manual[t.dataset.id];const st=skState();SKN.forEach(o=>{if(st[o.id]!=='done'){delete S.sk.done[o.id];delete S.sk.pre[o.id]}});save();render()},
  celeok:()=>{UI.cele.shift();renderOver()},
  bigph:t=>{UI.sheet={kind:'bigph',id:t.dataset.id};renderSheet()},
- recap:t=>{UI.sheet={kind:'recap',ym:t.dataset.m};renderSheet()},
+ recap:t=>{UI.sheet={kind:'recap',ym:t.dataset.m};if(t.classList&&t.classList.contains('note')){S.profile.recapSeen=t.dataset.m;save()}renderSheet()},
  recapm:t=>{UI.sheet.ym=t.dataset.m;renderSheet()},
  resched:t=>{UI.sheet={kind:'resched',d:t.dataset.d};renderSheet()},
  reschmove:t=>{const {from,to,id}=t.dataset;S.resched[from]=null;S.resched[to]=id;UI.sheet=null;save();render();toast(S.program.find(x=>x.id===id).name+' moved to '+fmtDate(to))},
@@ -1734,6 +1768,7 @@ const A={
  reschreset:()=>{Object.keys(S.resched).forEach(d=>{if(reschThisWeek(d))delete S.resched[d]});UI.sheet=null;save();render();toast('Back to your normal week')},
  circsheet:t=>{const c=CIRCUITS.find(x=>x.id===t.dataset.id);UI.sheet={kind:'circ',id:c.id,o:{work:c.work,rest:c.rest,rounds:c.rounds,min:c.min,peak:5}};renderSheet()},
  circopt:t=>{UI.sheet.o[t.dataset.k]=+t.dataset.v;renderSheet()},
+ circdel:t=>{if(tapTwice())return;const i=+t.dataset.i,x=S.circLog[i];if(!x)return;S.circLog.splice(i,1);save();renderSheet();render();toast('Result deleted',()=>{S.circLog.splice(i,0,x);save();renderSheet();render()})},
  runstart:()=>{const c=CIRCUITS.find(x=>x.id===UI.sheet.id),o=UI.sheet.o;UI.sheet=null;renderSheet();keepAwake(true);
    if(c.type==='amrap'){UI.run={c:{...c,min:o.min},t0:Date.now(),end:Date.now()+o.min*60000,rounds:0,phase:'go'};beep(1040,300);renderOver()}
    else if(c.type==='ladder'){UI.run={c,t0:Date.now(),seq:ladderSeq(o.peak),peak:o.peak,step:0,phase:'go'};beep(1040,300);renderOver()}
@@ -1741,7 +1776,7 @@ const A={
  amrapround:()=>{UI.run.rounds++;buzz(40);beep(880,80);renderOver()},
  amrapundo:()=>{UI.run.rounds=Math.max(0,UI.run.rounds-1);renderOver()},
  ladnext:()=>{const r=UI.run;r.step++;buzz(40);beep(880,80);if(r.step>=r.seq.length)finishRun(Math.round((Date.now()-r.t0)/1000));else renderOver()},
- runfinish:()=>{const r=UI.run;finishRun(Math.round((Date.now()-r.t0)/1000))},
+ runfinish:t=>{if(t&&t.dataset&&t.dataset.arm&&!(UI.runEndArm>Date.now()-3000)){UI.runEndArm=Date.now();t.textContent='Tap again to save';return}UI.runEndArm=0;const r=UI.run;finishRun(Math.round((Date.now()-r.t0)/1000))},
  runpause:()=>{const r=UI.run;if(r.paused){r.end=Date.now()+r.left;r.paused=false}else{r.left=r.end-Date.now();r.paused=true}renderOver()},
  runskip:()=>{const r=UI.run;if(r.paused){r.paused=false}runAdvance()},
  // Ending a timed circuit early throws it away, so the first tap only asks.

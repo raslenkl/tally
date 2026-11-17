@@ -12,7 +12,7 @@ const hasAI=()=>{const g=gem();return !!(g.key||g.or)};
 const GK='recomp.gemini';
 const gem=()=>{try{return JSON.parse(localStorage.getItem(GK))||{}}catch(_){return {}}};
 const setGem=o=>{try{localStorage.setItem(GK,JSON.stringify({...gem(),...o}))}catch(_){}};
-const nset=()=>{const d={on:true,weigh:'07:30',gtg:true,timer:true,pills:true,mg:'23:00'};const o={...d,...(S.profile.notif||{})};if(!o.fe)o.fe=o.weigh;return o};
+const nset=()=>{const d={on:true,weigh:'07:30',gtg:true,timer:true,pills:true,mg:'23:00'};const o={...d,...(S.profile.notif||{})};if(!o.fe){const m=toMin(o.weigh)+10;o.fe=pad(Math.floor(m/60)%24)+':'+pad(m%60)}return o};
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 // A redraw nobody tapped for waits while you are typing (softRender, ui-more.js).
 const soft=()=>typeof softRender==='function'?softRender():render();
@@ -247,7 +247,7 @@ X.bfAI=()=>{const g=gem(),a=S.bfAI&&Object.entries(S.bfAI).sort().pop(),st=UI.bf
    :`<p class="small muted">Add an AI key in Settings to get an estimate from a photo.</p>`}</div>`};
 X.bfRun=async b64=>{UI.bfai={busy:true};render();try{const r=await bodyAI(b64);S.bfAI=S.bfAI||{};S.bfAI[TODAY]=r;UI.bfai={};save();toast('Photo estimate: '+Math.round(r.lo)+'–'+Math.round(r.hi)+'%')}
   catch(er){UI.bfai={err:er.offline?'No connection. Try again when you are online.':er.message}}render()};
-X.steps=()=>NATIVE?`<div class="card flat stack" style="padding:12px">${S.profile.hcOn?`<p class="small">Steps come from Health Connect automatically (last read ${UI.hcAt?UI.hcAt:'not yet'}).</p>${UI.hcErr?`<p class="tiny muted">Health Connect: ${esc(UI.hcErr)}</p>`:''}<div class="row" style="gap:6px"><button class="btn sm" data-a="hcread">Refresh now</button>${UI.hcErr&&/permission/i.test(UI.hcErr)?`<button class="btn sm" data-a="hcon">Reconnect</button>`:''}</div>`
+X.steps=()=>NATIVE?`<div class="card flat stack" style="padding:12px">${S.profile.hcOn?`<p class="small">Steps come from Health Connect automatically (last read ${UI.hcAt?UI.hcAt:'not yet'}).</p>${UI.hcErr?`<p class="tiny muted">Health Connect: ${esc(UI.hcErr)}</p>`:''}<div class="row" style="gap:6px"><button class="btn sm" data-a="hcread">Refresh now</button>${UI.hcErr?`<button class="btn sm" data-a="hcon">Reconnect</button>`:''}</div>`
    :`<p class="small"><b>Samsung Health steps</b></p><p class="small muted">In Samsung Health: Settings → Health Connect → turn on sync for Steps. Then connect here.</p><button class="btn sm primary" data-a="hcon">Connect Health Connect</button>`}</div>`
    :'<p class="small muted">The Android app reads this from Samsung Health automatically.</p>';
 X.gtgNote=()=>NATIVE&&nset().on&&nset().gtg?'The notification has a one-tap "Done" button that logs the set and restarts the clock.':NATIVE?'Rep reminders are off in Settings.':'The Android app sends these as quiet notifications.';
@@ -354,14 +354,14 @@ X.setAI=()=>{const g=gem(),T=UI.gemT||{},c=aic(),q=(S.aiq||[]).length;return `
      <p class="tiny muted">Food search works without it but runs out after a few searches an hour. Free at api.data.gov/signup.</p></div></div></details>`};
 X.setNotif=()=>{if(!NATIVE)return '<p class="small muted">Notifications come with the Android app.</p>';const n=nset(),off=!n.on;
   const sw=(k,l,sub)=>`<label class="srow"><span class="grow"><b>${l}</b>${sub?`<br><span class="small muted">${sub}</span>`:''}</span><input type="checkbox" class="switch" ${n[k]?'checked':''} data-c="ntog" data-k="${k}"></label>`;
-  const tm=(l,sub,v,attrs)=>`<label class="srow${off?' dim':''}"><span class="grow"><b>${l}</b><br><span class="small muted">${sub}</span></span><input type="time" value="${v}" ${attrs}></label>`;
+  const tm=(l,sub,v,attrs,dim)=>`<label class="srow${off||dim?' dim':''}"><span class="grow"><b>${l}</b><br><span class="small muted">${sub}</span></span><input type="time" value="${v}" ${attrs}></label>`;
   return `${UI.nPerm&&UI.nPerm!=='granted'?'<div class="note"><p><b class="hi">Notifications are blocked for Tally.</b> Nothing below can reach you until you allow them: Android Settings → Apps → Tally → Notifications.</p></div>':''}<div class="card slist">${sw('on','All notifications')}</div>
    <p class="label" style="margin-top:4px">Reminders</p>
    <div class="card slist">
     ${tm('Morning weigh-in','Skipped once you have logged today',n.weigh,'data-c="nweigh"')}
     ${sw('pills','Pill reminders')}
-    ${tm('Iron (fer)','When you wake up',n.fe,'data-c="ntime" data-k="fe"')}
-    ${tm('Magnesium','Before you sleep',n.mg,'data-c="ntime" data-k="mg"')}</div>
+    ${tm('Iron (fer)','When you wake up',n.fe,'data-c="ntime" data-k="fe"',!n.pills)}
+    ${tm('Magnesium','Before you sleep',n.mg,'data-c="ntime" data-k="mg"',!n.pills)}</div>
    <p class="label" style="margin-top:4px">Training</p>
    <div class="card slist">${sw('gtg','Rep reminders','Quiet, no vibration')}${sw('timer','Rest timer done','Rings when the rest is over')}</div>
    <button class="btn sm" data-a="ntest" style="align-self:flex-start">Send a test notification</button>`};
@@ -372,11 +372,13 @@ async function nInit(){if(!NATIVE||!LN)return;try{
   await LN.createChannel({id:'remind',name:'Reminders',importance:3,vibration:true});
   await LN.createChannel({id:'quiet',name:'Rep windows',importance:2,vibration:false});
   await LN.createChannel({id:'timer',name:'Rest timer',importance:4,vibration:true});
-  await LN.registerActionTypes({types:[{id:'gtg',actions:[{id:'done',title:'Done'}]},{id:'pill',actions:[{id:'took',title:'Taken'}]},
+  await LN.registerActionTypes({types:[{id:'gtg',actions:gtgActs()},{id:'pill',actions:[{id:'took',title:'Taken'},{id:'skip',title:'Skip today'}]},
     {id:'weigh',actions:[{id:'kg',title:'Log weight',input:true,inputButtonTitle:'Save',inputPlaceholder:'kg, e.g. 74.6'}]}]});
   LN.addListener('localNotificationActionPerformed',a=>{const ex=a.notification&&a.notification.extra||{};
-    if(ex.kind==='gtg'&&a.actionId==='done'){const g=gtgDay(TODAY);S.gtg.on.forEach(id=>{(g[id]=g[id]||[]).push(setSize(id))});gtgMark();save();render();toast('Set logged. Next reminder in '+everyTxt(S.gtg.remind.every))}
-    else if(ex.kind==='pill'){const d=ex.d||TODAY;if(a.actionId==='took'){const sp=S.supps[d]=S.supps[d]||{};sp[ex.k]=true;if(ex.k==='fe'&&d===TODAY)sp.feAt=nowMinD();save();toast((ex.k==='fe'?'Iron':'Magnesium')+' ticked')}UI.tab='today';render()}
+    if(ex.kind==='gtg'&&/^m:/.test(a.actionId||'')){const m=a.actionId.slice(2);if(MOVES.some(x=>x.id===m)){logRep(m,setSize(m),true);toast(moveTxt(m,setSize(m))+' logged. Next reminder in '+everyTxt(S.gtg.remind.every))}}
+    else if(ex.kind==='gtg'&&a.actionId==='done'){const g=gtgDay(TODAY);S.gtg.on.forEach(id=>{(g[id]=g[id]||[]).push(setSize(id))});gtgMark();save();render();toast('Set logged. Next reminder in '+everyTxt(S.gtg.remind.every))}
+    else if(ex.kind==='pill'){const d=ex.d||TODAY;if(a.actionId==='skip'){const sp=S.supps[d]=S.supps[d]||{};sp.sk={...(sp.sk||{}),[ex.k]:1};save();toast((ex.k==='fe'?'Iron':'Magnesium')+' skipped today')}
+      else if(a.actionId==='took'){const sp=S.supps[d]=S.supps[d]||{};sp[ex.k]=true;if(ex.k==='fe'&&d===TODAY)sp.feAt=nowMinD();save();toast((ex.k==='fe'?'Iron':'Magnesium')+' ticked')}UI.tab='today';render()}
     else if(ex.kind==='gtg'&&a.actionId==='tap'){UI.tab='today';UI.sheet={kind:'repset'};render()}
     // Typed straight into the notification: saved as a fasted morning weigh-in for the day it was sent.
     else if(ex.kind==='weigh'&&a.actionId==='kg'){const v=parseFloat(String(a.inputValue||'').replace(',','.')),d=ex.d||TODAY;
@@ -385,6 +387,9 @@ async function nInit(){if(!NATIVE||!LN)return;try{
         if(!morn&&f){render();toast("Kept this morning's "+f.kg+" kg")}else{const old=putWeight(d,Math.round(v*10)/10,t,morn);render();weightToast(d,old,morn?'Weigh-in saved: '+v+' kg':'Saved '+v+' kg, kept out of the trend (not a morning weigh-in)')}}else{UI.tab='today';UI.sheet={kind:'weight'};render();toast('Could not read "'+(a.inputValue||'')+'". Type it here.')}}
     else if(ex.kind==='weigh'){UI.tab='today';UI.sheet={kind:'weight'};render();setTimeout(()=>{const i=document.getElementById('wIn3');if(i)i.focus()},300)}});
   let p=await LN.checkPermissions();if(p.display!=='granted')p=await LN.requestPermissions();UI.nPerm=p.display;nSync()}catch(e){console.warn(e)}}
+// Rep reminder buttons: one per move in rotation (Android shows up to 3), so the set you did is one tap.
+const gtgActs=()=>{const a=S.gtg.on.slice(0,3).map(id=>({id:'m:'+id,title:moveTxtS(id,setSize(id))}));return a.length?a:[{id:'done',title:'Done'}]};
+let gtgActKey='';
 let syncT;function nSyncSoon(){clearTimeout(syncT);syncT=setTimeout(nSync,800)}
 async function nSync(){if(!NATIVE||!LN)return;try{
   try{UI.nPerm=(await LN.checkPermissions()).display}catch(_){}
@@ -393,7 +398,9 @@ async function nSync(){if(!NATIVE||!LN)return;try{
   [0,1].forEach(off=>{const d=addDays(TODAY,off),t=at(d,toMin(n.weigh));if(t>now&&!S.weights.some(w=>w.d===d&&!w.sample))
     out.push({id:ID.weigh+off,title:'Morning weigh-in',body:'After the toilet, before food or water. Pull down to type it here.',channelId:'remind',actionTypeId:'weigh',schedule:{at:t,allowWhileIdle:true},extra:{kind:'weigh',d}})});
   // Rep reminder: ONE pending at a time. The next comes `every` minutes after the last logged set.
-  if(n.gtg&&S.gtg.on.length){const names=S.gtg.on.map(id=>{const m=MOVES.find(x=>x.id===id);return m?moveTxtS(id,setSize(id)):''}).filter(Boolean).join(', ');
+  if(n.gtg&&S.gtg.on.length){const names='Any one: '+S.gtg.on.map(id=>{const m=MOVES.find(x=>x.id===id);return m?moveTxtS(id,setSize(id)):''}).filter(Boolean).join(', ');
+    // Set sizes change as you get stronger: refresh the buttons when they do.
+    const key=JSON.stringify(gtgActs());if(key!==gtgActKey){gtgActKey=key;try{await LN.registerActionTypes({types:[{id:'gtg',actions:gtgActs()},{id:'pill',actions:[{id:'took',title:'Taken'},{id:'skip',title:'Skip today'}]},{id:'weigh',actions:[{id:'kg',title:'Log weight',input:true,inputButtonTitle:'Save',inputPlaceholder:'kg, e.g. 74.6'}]}]})}catch(_){}}
     const step=Math.max(15,+S.gtg.remind.every||90);
     const add=(id,t)=>out.push({id,title:'Rep set',body:names,channelId:'quiet',actionTypeId:'gtg',schedule:{at:t,allowWhileIdle:true},extra:{kind:'gtg'}});
     // A set that's already due (you opened the app late, or ignored the last one) still gets a reminder: the next
@@ -403,7 +410,7 @@ async function nSync(){if(!NATIVE||!LN)return;try{
     // Tomorrow's first is always queued too, so an ignored reminder never stops the next day's.
     add(ID.gtg+1,at(addDays(TODAY,1),toMin(S.gtg.remind.start)))}
   if(n.pills)[['fe',n.fe,'Iron (fer)','Take it now with water, on an empty stomach. Coffee, tea, milk and whey at least an hour later.'],['mg',n.mg,'Magnesium','Take it before you sleep.']].filter(([k])=>hasSupp(k)).forEach(([k,tm,title,body])=>
-    [0,1].forEach(off=>{const d=addDays(TODAY,off),t=at(d,toMin(tm));if(t>now&&!(S.supps[d]||{})[k])out.push({id:ID[k]+off,title,body,channelId:'remind',actionTypeId:'pill',schedule:{at:t,allowWhileIdle:true},extra:{kind:'pill',k,d}})}));
+    [0,1].forEach(off=>{const d=addDays(TODAY,off),t=at(d,toMin(tm));if(t>now&&!suppOK(S.supps[d],k))out.push({id:ID[k]+off,title,body,channelId:'remind',actionTypeId:'pill',schedule:{at:t,allowWhileIdle:true},extra:{kind:'pill',k,d}})}));
   if(out.length)await LN.schedule({notifications:out})}catch(e){console.warn(e)}}
 let lastTimer=0;setInterval(async()=>{if(!NATIVE||!LN)return;const te=UI.timerEnd||0;if(te===lastTimer)return;lastTimer=te;
   try{await LN.cancel({notifications:[{id:ID.timer}]});const n=nset();if(te>Date.now()+3000&&n.on&&n.timer)await LN.schedule({notifications:[{id:ID.timer,title:'Rest done',body:'Next set.',channelId:'timer',schedule:{at:new Date(te),allowWhileIdle:true}}]})}catch(e){}},1000);
@@ -413,7 +420,10 @@ let lastTimer=0;setInterval(async()=>{if(!NATIVE||!LN)return;const te=UI.timerEn
 // (it does on some Health Connect / Samsung versions), the raw step records summed per day here.
 // The raw path also respects "Your day ends at". Per day it takes the source with the most steps, so a phone
 // and a watch counting the same walk aren't added together.
-async function hcSteps(start,end){
+// The plugin only creates its Health Connect client inside isHealthAvailable(). Without this, every read after an
+// app restart fails with "lateinit property healthConnectClient has not been initialized". Once per launch.
+let hcReady=null;const hcInit=()=>hcReady||(hcReady=HP.isHealthAvailable().then(r=>{if(!r||!r.available){hcReady=null;throw new Error('Health Connect is not available on this phone')}}).catch(e=>{hcReady=null;throw e}));
+async function hcSteps(start,end){await hcInit();
   try{const r=await HP.queryAggregated({startDate:start.toISOString(),endDate:end.toISOString(),dataType:'steps',bucket:'day'});
     // The plugin answers an empty list, not an error, when the Steps permission was taken away.
     const a=r.aggregatedData||[];if(!a.length)throw new Error('Steps permission is off. Tap Connect again or allow it in Health Connect.');
@@ -440,7 +450,7 @@ async function mfpOn(){if(!HP)return;try{const r=await hcAsk(['READ_NUTRITION'])
 const MEAL={breakfast:'Breakfast',lunch:'Lunch',dinner:'Dinner',snack:'Snack'};
 async function mfpSync(quiet){if(!NATIVE||!HP||!S.profile.mfp)return;try{
   const days=[0,1,2].map(i=>addDays(TODAY,-i));
-  const r=await HP.queryNutrition({startDate:new Date(+parse(days[2])+dayEnd()*6e4).toISOString(),endDate:new Date(+parse(addDays(TODAY,1))+dayEnd()*6e4).toISOString()});
+  await hcInit();const r=await HP.queryNutrition({startDate:new Date(+parse(days[2])+dayEnd()*6e4).toISOString(),endDate:new Date(+parse(addDays(TODAY,1))+dayEnd()*6e4).toISOString()});
   // With the public diary also connected, MyFitnessPal's own entries come from the diary: taking them here too would count them twice.
   const diary=!!S.profile.mfpUser;impPrune();
   const by={};(r.entries||[]).forEach(e=>{if(/recomp/i.test(e.sourceBundleId||''))return;if(diary&&/myfitnesspal/i.test(e.sourceBundleId||''))return;const d=dayOf(Date.parse(e.startDate));(by[d]=by[d]||[]).push(e)});

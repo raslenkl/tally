@@ -4,7 +4,7 @@
    Pictures and fonts: from the cache once seen; the exercise drawings are fetched in the background after install,
    so they work offline even before you've opened each one. Other sites (AI, food databases) are never cached.
    deploy-web.sh gives V a new name on every publish. */
-const V='tally-202611171051';
+const V='tally-202611171129';
 const CORE=['index.html','app.css','poses.js','tips.js','native.js','ui-core.js','ui-more.js','manifest.webmanifest',
   'icon.svg','icon-180.png','icon-192.png','icon-512.png','icon-mask-512.png',
   'fonts/BigShouldersDisplay-latin.woff2','fonts/BigShouldersDisplay-latin-ext.woff2','fonts/Manrope-latin.woff2','fonts/Manrope-latin-ext.woff2'];

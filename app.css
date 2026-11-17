@@ -148,6 +148,7 @@ body.plus .tabs{z-index:40}
 .tick.on svg.ic{color:var(--mint)}
 .tick.due{color:var(--signal);border-color:color-mix(in srgb,var(--signal) 42%,transparent)}
 .tick.due svg.ic{color:var(--signal)}
+.tick.skip{color:var(--faint);background:transparent;border-style:dashed}
 .tl{display:flex;flex-direction:column}
 .tl .it{display:grid;grid-template-columns:46px 12px 1fr auto;gap:10px;align-items:center;padding:9px 0;position:relative;border:0;background:none;color:inherit;font:inherit;text-align:left;width:100%}
 .tl .t{font-family:var(--display);font-weight:800;font-size:17px;color:var(--muted);font-variant-numeric:tabular-nums}
@@ -568,3 +569,37 @@ body.mapon .sheet-bg{z-index:48}
 .glanes.vtight .c{white-space:normal;overflow-wrap:anywhere;line-height:1.15;font-size:10px}
 .glanes.vtight .who{font-size:8.5px;padding-right:2px}
 .gl{font-weight:800}.gl.up{color:var(--mint)}.gl.eq{color:var(--hi)}.gl.dn{color:var(--warn)}
+
+/* Skill tree: the constellation picture and the routes under it */
+.cons svg{width:100%;height:auto;display:block;margin:2px 0 4px;overflow:visible}
+.cons .spoke{cursor:pointer}
+.cons .spoke.lk{opacity:.55}
+.cons .spoke.on{opacity:1}
+.cons .sptx{font-size:8.5px;font-weight:700;fill:var(--muted);font-family:var(--body)}
+.cons .spoke.on .sptx{fill:var(--hi)}
+.cons .sptx.c{fill:var(--accent-ink);font-family:var(--display);font-size:11px;font-weight:900}
+.cons .lg{display:inline-block;width:9px;height:9px;border-radius:50%;border:1.5px solid var(--line2);margin-right:5px;vertical-align:-1px}
+.cons .lg.on{background:var(--accent);border-color:var(--accent)} .cons .lg.cur{border-color:var(--accent);width:11px;height:11px}
+.routes{padding:4px 14px}
+.route{border-bottom:1px solid var(--line)} .route:last-child{border-bottom:0}
+.rhead{display:flex;align-items:center;gap:10px;width:100%;padding:12px 0;background:none;border:0;color:inherit;font:inherit;text-align:left}
+.rhead b{display:block;font-size:15px}
+.rsub{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.route.locked .rhead{opacity:.55}
+.rdots{display:flex;gap:3px;align-items:center;flex:none}
+.rdots i{width:7px;height:7px;border-radius:50%;border:1.5px solid var(--line2)}
+.rdots i.on{background:var(--accent);border-color:var(--accent)} .rdots i.cur{border-color:var(--accent);width:10px;height:10px}
+.skladder{position:relative;padding:2px 0 14px}
+.skladder:before{content:'';position:absolute;left:19px;top:30px;bottom:30px;width:2px;background:var(--line)}
+.lstep{position:relative;display:flex;align-items:flex-start;gap:12px;width:100%;padding:8px 0;background:none;border:0;color:inherit;font:inherit;text-align:left}
+.lstep .disc.sm{width:40px;height:40px;flex:none}
+.lstep .disc.sm>span{width:32px;height:32px;font-size:13px}
+.lstep .disc.sm>span svg{width:16px;height:16px}
+.lstep.done .disc,.lstep.done .disc>span{background:var(--accent);color:var(--accent-ink)}
+.lstep.locked .disc,.lstep.locked .disc>span{background:var(--raise);color:var(--muted)}
+.lstep.locked .grow{opacity:.55}
+.lstep.cur .disc{box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 30%,transparent)}
+.lstep b{font-size:14px;color:var(--hi)}
+.lstep .grow{padding-top:2px}
+.lstep .sklink{display:block;font-size:11.5px;color:var(--violet);margin-top:2px}
+.lstep .sklink.ok{color:var(--muted)}

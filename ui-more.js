@@ -92,7 +92,7 @@ function photoCard(){
   return `<div class="card stack"><div class="row between"><h3>Photos</h3>${due?`<span class="tag sig">${ps.length?'Due':'Take your first set'}</span>`:`<span class="tiny muted">next ${dShort(next)}</span>`}</div>
    ${latest.length?`<div class="phs">${latest.map(x=>`<button data-a="phopen" data-pose="${x.pose}" aria-label="${capW(x.pose)} photos"><img data-ph="${x.id}" alt=""><span>${capW(x.pose)} · ${dShort(x.d)}</span></button>`).join('')}</div>`
     :`<p class="small muted">Every 2 weeks: morning, same light, same spot. Your last photo shows faintly in the camera so you can match the pose, and compare is one tap.</p>`}
-   <div class="grid2"><button class="btn primary" data-a="camopen" data-pose="front">Take photos</button><button class="btn" data-a="phopen" data-pose="front">${ps.length>1?'Compare':'Add old photos'}</button></div></div>`}
+   <div class="grid2"><button class="btn primary" data-a="camopen" data-pose="front">Take photos</button><button class="btn" data-a="phopen" data-pose="front">${photosOf('front').length>1?'Compare':'Add old photos'}</button></div></div>`}
 function photosSheet(){
   const pose=UI.phPose||'front',ps=photosOf(pose),a=ps.find(x=>x.id===UI.phA)||ps[0],b=ps.find(x=>x.id===UI.phB)||ps[ps.length-1];
   const opt=(sel)=>ps.map(x=>`<option value="${x.id}" ${x.id===sel.id?'selected':''}>${fmtDate(x.d)}</option>`).join('');
@@ -264,11 +264,11 @@ function sheetX0(s){
      ${mfp?`<div class="row small muted">${ic('repeat')}<span class="grow">MyFitnessPal · ${mn} entr${mn===1?'y':'ies'} today${UI.mfpdAt||UI.mfpAt?' · synced '+(UI.mfpdAt||UI.mfpAt):''}</span><button class="btn sm" data-a="${S.profile.mfpUser?'mfpdsync':'mfpsync'}">Sync</button></div>`:''}
      ${HIST.length?`<button class="linkbtn" data-a="sheet" data-k="hist" style="align-self:flex-start">Undo something · ${HIST.length} recent change${HIST.length>1?'s':''}</button>`:''}`}
   if(k==='repset'){const g=gtgDay(TODAY),nx=gtgNext(),tr=trainedToday();
-    return `<h2>Rep set</h2><p class="small muted">One easy set of each, about half your max. ${nx==null?'Reminders are done for today.':nx<=nowMin()?'A set is due now.':'Next reminder at '+hm(nx)+'.'}</p>
-     <button class="btn cta block" data-a="repall">Did it · ${repSetTxt()}</button>
+    return `<h2>Rep set</h2><p class="small muted">One easy set of any move is enough, about half your max. ${nx==null?'Reminders are done for today.':nx<=nowMin()?'A set is due now.':'Next reminder at '+hm(nx)+'.'}</p>
      <div class="card">${MOVES.filter(m=>S.gtg.on.includes(m.id)).map(m=>{const dn=g[m.id]||[];return `<div class="ex"><span class="thumb">${gMedia(m.g)}</span><span class="grow"><b>${m.n}</b><br><span class="small muted">${dn.length?'today:':'none yet'}${tr.has(m.m)&&m.m!=='abs'?' · trained in the gym today':''}</span>${dn.length?`<span class="row wrap" style="gap:4px;margin-top:4px">${dn.map((v,i)=>`<button class="chip" data-a="gtgrm" data-m="${m.id}" data-i="${i}" aria-label="Remove the set of ${v}" style="padding:3px 8px;font-size:12px">${v}${m.u==='s'?' s':''} <span class="muted">×</span></button>`).join('')}</span>`:''}</span>
        <input class="num" id="rs-${m.id}" type="number" inputmode="numeric" value="${setSize(m.id)}" aria-label="${m.n} ${m.u==='s'?'seconds':'reps'}" style="width:70px;padding:7px"><button class="btn sm" data-a="gtglog2" data-m="${m.id}">Log</button>${m.u==='s'?`<button class="icon-btn s" data-a="htsheet" data-m="${m.id}" aria-label="Time the ${m.n.toLowerCase()}">${ic('clock')}</button>`:''}</div>`}).join('')}</div>
-     <div class="row"><button class="btn sm ghost" data-a="remindsheet">Reminder times</button><button class="btn sm ghost" data-a="tab" data-t="train" data-tt="reps">Open daily reps</button></div>`}
+     ${S.gtg.on.length>1?`<button class="btn sm ghost" data-a="repall">Did all ${S.gtg.on.length} · ${repSetTxt()}</button>`:''}
+     <div class="row wrap"><button class="btn sm ghost" data-a="remindsheet">Reminder times</button><button class="btn sm ghost" data-a="tab" data-t="train" data-tt="reps">Open daily reps</button></div>`}
   if(k==='weight'){const ws=countedW().slice(-5).reverse(),lw=ws[0],tw=S.weights.find(x=>x.d===TODAY&&!x.sample);
     return `<h2>Morning weight</h2><p class="small muted">Right after waking, after the toilet, before food or water. Same scale, same spot.</p>
      <div class="row"><input class="num grow" id="wIn3" type="number" inputmode="decimal" step="0.1" placeholder="${lw?lw.kg:'kg'}" value="${tw?tw.kg:''}" aria-label="Weight in kg" style="font-size:30px;padding:12px"><button class="btn cta" data-a="logw3" style="padding:16px 20px">Save</button></div>
@@ -367,7 +367,7 @@ function settingsSheet(s){const p=S.profile,t=targets(),pg=s.pg;
     <label class="srow"><span class="grow"><b>Protein</b><br><span class="small muted">grams per kg</span></span><input class="num sin" type="number" inputmode="decimal" step="0.1" placeholder="2.2" value="${p.protPerKg>0?p.protPerKg:''}" data-c="setnum" data-f="protPerKg" aria-label="Protein grams per kg"></label>
     <label class="srow"><span class="grow"><b>Fat</b><br><span class="small muted">grams per kg</span></span><input class="num sin" type="number" inputmode="decimal" step="0.1" placeholder="0.9" value="${p.fatPerKg>0?p.fatPerKg:''}" data-c="setnum" data-f="fatPerKg" aria-label="Fat grams per kg"></label>
     <label class="srow"><span class="grow"><b>Weight ceiling</b><br><span class="small muted">kg, morning weight</span></span><input class="num sin" type="number" inputmode="decimal" step="0.5" value="${p.ceiling}" data-c="setnum" data-f="ceiling" aria-label="Weight ceiling"></label></div>
-   <p class="label" style="margin-top:4px">Daily steps goal</p>
+   <p class="label" style="margin-top:4px">Steps a day</p>
    <div class="card slist">
     ${(()=>{const f=p.loc==='MY'?'stepsMY':'stepsTN';return `<label class="srow"><span class="grow"><b>Steps a day</b><br><span class="small muted">A normal day. Real step counts take over once you have 5 days of them.</span></span><input class="num sin" type="number" inputmode="numeric" step="500" value="${p[f]}" data-c="setnum" data-f="${f}" aria-label="Steps a day"></label>`})()}</div>
    <div class="card slist">${swF('lowEffort',p.lowEffort,'Low-effort food mode','Track protein only. Calories come from the weight trend.')}</div>
@@ -392,7 +392,7 @@ function settingsSheet(s){const p=S.profile,t=targets(),pg=s.pg;
   if(pg==='notif')return `${head('Notifications')}${hook('setNotif')}`;
   if(pg==='data'){const ago=bkAgo();return `${head('Backup and data')}
    <div class="card stack"><div class="row between"><p class="label">Backup</p><span class="chip ${ago==null||ago>7?'warn':'good'}">${ago==null?'Never backed up':ago===0?'Backed up today':ago+' d ago'}</span></div>
-    <p class="small">Your data lives only on this phone. Save a backup every week and keep it in Drive or send it to yourself.</p>
+    <p class="small">Your data lives only on this phone. Save a backup every week and keep it in Drive or send it to yourself. Progress photos are not in this file.</p>
     ${s.pending?`<p class="small"><b>Replace everything with the backup from ${s.pendingWhen}?</b> ${s.pending.weights.length} weigh-ins, ${s.pending.log.length} workouts. What's on this phone now is lost.</p>
      <div class="row"><button class="btn grow" data-a="importno">Cancel</button><button class="btn grow primary" data-a="importyes">Restore</button></div>`
     :`<div class="grid2"><button class="btn primary" data-a="exportdata">Save backup</button><label class="btn" style="text-align:center">Restore<input type="file" accept="application/json,.json" data-c="importfile" hidden></label></div>`}
@@ -404,7 +404,7 @@ function settingsSheet(s){const p=S.profile,t=targets(),pg=s.pg;
   // Home
   const ago=bkAgo(),row=(pg,icn,l,sub,right)=>`<button class="srow" data-a="setpg" data-v="${pg}"><span class="sic">${ic(icn)}</span><span class="grow"><b>${l}</b><br><span class="small muted">${sub}</span></span>${right||''}${ic('chevR','muted')}</button>`;
   const ai=hook('aiState'),nt=hook('notifState');
-  return `<h2>${p.name?esc(p.name):'Settings'}</h2>${p.name?'<p class="label" style="margin-top:-8px">Settings</p>':''}
+  return `<h2>Settings</h2>
    <div class="card shero"><div class="grow"><p class="label">${GOALN[p.goal]||'Goal'} · ${p.loc==='MY'?'Malaysia':p.loc==='XX'?esc(p.region||'Elsewhere'):'Tunisia'}</p><p class="num hi" style="font-size:30px;line-height:1.05;margin-top:4px">${fmt(t.k)}<small class="muted"> kcal</small> · ${t.pr}<small class="muted"> g protein</small></p></div></div>
    <div class="card slist">
     ${row('goal','target','Goal and food','Goal, targets, steps, Ramadan')}
@@ -581,6 +581,7 @@ Object.assign(A,{
    if(raw===''){delete S[f][yd];save();render();return toast(f==='steps'?'Steps cleared':'Sleep cleared')}
    if(f==='steps'?!(v>=0&&v<=60000):!(v>0&&v<=16))return toast(f==='steps'?'Steps, e.g. 6500':'Hours slept, e.g. 7');
    S[f][yd]=f==='steps'?Math.round(v):Math.round(v*100)/100;save();render();toast((f==='steps'?'Steps':'Sleep')+' saved for '+fmtDate(yd))},
+ activedrop:()=>{if(tapTwice())return;const a=S.active;if(!a)return;S.active=null;save();render();toast('Unfinished session discarded',()=>{S.active=a;save();render()})},
  planwk:t=>{UI.planWk=Math.min(0,(UI.planWk||0)+(+t.dataset.d));UI.planDay=null;render()},
  setsupp:t=>{const k=t.dataset.k,a=Array.isArray(S.profile.supps)?S.profile.supps:SUPPN.map(x=>x[0]),i=a.indexOf(k);if(i>=0)a.splice(i,1);else a.push(k);S.profile.supps=a;save();render()},
  hintoff:()=>{UI.hintOff=true;render()},
@@ -654,14 +655,14 @@ Object.assign(A,{
    const val=id=>{const i=document.getElementById('rs-'+id),v=i?parseInt(i.value):NaN;return v>0?v:setSize(id)};let pr=false;
    ids.forEach(id=>{const v=val(id);(g[id]=g[id]||[]).push(v);if(v!==setSize(id)&&BIG3.some(b=>b[0]===id)&&maybePR(id,v,'set'))pr=true});if(pr)toast('New record logged');gtgMark();save();if(UI.sheet&&UI.sheet.kind==='repset')UI.sheet=null;render();buzz(30);
    toast('Set logged · next in '+everyTxt(S.gtg.remind.every),()=>{ids.forEach(id=>{const v=(g[id]||[]).pop();if(v!=null)unPR(id,TODAY,v)});S.gtg.last=prev;save();render()})},
- gtglog2:t=>{const m=t.dataset.m,v=parseInt($('#rs-'+m).value);if(!(v>0))return toast('Enter how many you did');const g=gtgDay(TODAY);(g[m]=g[m]||[]).push(v);gtgMark();
-   const pr=BIG3.some(b=>b[0]===m)&&maybePR(m,v,'set');save();render();buzz(pr?[40,60,40]:30);toast(pr?'New record: '+moveTxt(m,v):moveTxt(m,v)+' logged')},
+ gtglog2:t=>{const m=t.dataset.m,v=parseInt($('#rs-'+m).value);if(!(v>0))return toast('Enter how many you did');logRep(m,v)},
  logw3:()=>{const v=parseFloat($('#wIn3').value);if(!(v>40&&v<150))return toast('Enter your weight in kg, e.g. 76.4');UI.sheet=null;logWeight(v)},
  setsleep:t=>{const v=t.dataset.v!=null?+t.dataset.v:parseFloat((($('#slIn2')||{}).value||'').replace(',','.'));if(!(v>0&&v<=16))return toast('Hours slept, e.g. 4.5');
    const d=TODAY,o=S.sleep[d];S.sleep[d]=Math.round(v*100)/100;UI.sheet=null;save();render();toast('Sleep saved · '+S.sleep[d]+' h',()=>{if(o==null)delete S.sleep[d];else S.sleep[d]=o;save();render()})},
  supp:t=>{const k=t.dataset.k,s=S.supps[TODAY]=S.supps[TODAY]||{};
    // Whey opens the shake picker (scoops, milk, creatine); the shake is logged from there.
    if(k==='wh'&&!s.wh){UI.sheet={kind:'shake'};renderSheet();return}
+   if(suppSkipped(s,k)){delete s.sk[k];if(!Object.keys(s.sk).length)delete s.sk}
    s[k]=!s[k];
    if(k==='fe'){if(s.fe)s.feAt=nowMinD();else delete s.feAt}
    if(k==='cr'){crStart(s.cr);delete s.crBy}
